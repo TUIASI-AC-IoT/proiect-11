@@ -1,3 +1,4 @@
+import random
 from enum import IntEnum
 
 
@@ -52,19 +53,50 @@ class Server_Error(Code):
     Gateway_timeout = 4
 
 
+class Options(IntEnum):
+    URI_HOST = 3
+    URI_PORT = 7
+    URI_PATH = 11
+
+
 # Class for managing a CoAP message
 class Message:
     __version = 1
 
-    def __init__(self, msgType, msgClass, msgCode):
+    def __init__(self, msgType, msgClass, msgCode, msgId):
+        self.__msgId = int(random.random()*65535)
         self.__msgType = msgType
         self.__msgClass = msgClass
         self.__msgCode = msgCode
-        self.__token = b'666'
+        self.__token = 666
+        self.__options = list()
 
     def encode(self):
         message = bytearray()
-        message.append(((self.__version << 6) + (self.__msgType << 4) + len(self.__token)))
+
+        # calculate token length
+        tk_len = 0
+        if self.__token != 0:
+            for i in range(1, 8):
+                if self.__token < 2**(i*8):
+                    tk_len = i
+                    break
+
+        message.append(((self.__version << 6) + (self.__msgType << 4) + tk_len))
         message.append((self.__msgClass << 5) + self.__msgCode)
+        for b in self.__msgId.to_bytes(2, 'big'):
+            message.append(b)
+        for b in self.__token.to_bytes(tk_len, 'big'):
+            message.append(b)
+
+        # append options bytes
+        for (op, val) in self.__options:
+            message.append(((op << 4)+len(val)))
+            for b in bytes(val, 'utf-8'):
+                message.append(b)
+
         return message
+
+    def add_option(self, option, value):
+        self.__options.append((option, value))
 
