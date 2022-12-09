@@ -95,6 +95,7 @@ class Message:
             for b in bytes(val, 'utf-8'):
                 message.append(b)
 
+        print(self.__msgId)
         return message
 
     def add_option(self, option, value):
