@@ -54,9 +54,13 @@ class Server_Error(Code):
 
 
 class Options(IntEnum):
-    URI_HOST = 3
-    URI_PORT = 7
+    LOCATION_PATH = 8
     URI_PATH = 11
+    CONTENT_FORMAT = 12
+    BLOCK2 = 23
+    BLOCK1 = 27
+    # SIZE2 = 28
+    # SIZE1 = 60
 
 
 # Class for managing a CoAP message
@@ -70,6 +74,7 @@ class Message:
         self.__msgCode = msgCode
         self.__token = 666
         self.__options = list()
+        self.__payload = bytearray()
 
     def encode(self):
         message = bytearray()
@@ -90,14 +95,60 @@ class Message:
             message.append(b)
 
         # append options bytes
+        prevOption = 0
         for (op, val) in self.__options:
-            message.append(((op << 4)+len(val)))
-            for b in bytes(val, 'utf-8'):
+            if type(val) is str:
+                valLen = len(val)
+            else:
+                for i in range(1, 8):
+                    if val < 2 ** (i * 8):
+                        valLen = i
+                        break
+
+            if (op - prevOption) < 13:
+                if valLen < 13:
+                    message.append(((op - prevOption) << 4) + valLen)
+                elif valLen < 269:
+                    message.append(((op - prevOption) << 4) + 13)
+                    message.append(valLen - 13)
+                else:
+                    message.append(((op - prevOption) << 4) + 14)
+                    message.append(valLen - 269)
+
+                prevOption = op
+            else:
+                if valLen < 13:
+                    message.append((13 << 4) + valLen)
+                    message.append(op - prevOption - 13)
+                elif valLen < 269:
+                    message.append((13 << 4) + 13)
+                    message.append(op - prevOption - 13)
+                    message.append(valLen - 13)
+                else:
+                    message.append((13 << 4) + 14)
+                    message.append(op - prevOption - 13)
+                    message.append(valLen - 269)
+
+                prevOption = op
+
+            # append option value
+            if type(val) is str:
+                for b in bytes(val, 'ascii'):
+                    message.append(b)
+            else:
+                for b in val.to_bytes(valLen, 'big'):
+                    message.append(b)
+
+        # append payload if exist
+        if len(self.__payload) != 0:
+            message.append(255)
+            for b in self.__payload:
                 message.append(b)
 
-        print(self.__msgId)
         return message
 
-    def add_option(self, option, value):
+    def addOption(self, option, value):
         self.__options.append((option, value))
 
+    def addPayload(self, content):
+        self.__payload = content
