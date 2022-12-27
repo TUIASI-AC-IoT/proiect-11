@@ -155,21 +155,89 @@ class Message:
         self.__payload = content
 
     def decode(self, data: bytearray):
-        if(data[0] & 0xC0 >> 6) != self.__version:
+        if ((data[0] & 0xC0) >> 6) != self.__version:
+            print(data[0] & 0xC0 >> 6)
             raise Exception("Invalid Version")
 
-        self.__msgType = data[0] & 0x30 >> 4
+        self.__msgType = (data[0] & 0x30) >> 4
         self.__tk_len = data[0] & 0x0F
 
-        self.__msgClass = data[1] & 0xE0 >> 5
+        self.__msgClass = (data[1] & 0xE0) >> 5
         self.__msgCode = data[1] & 0x1F
 
         self.__msgId = int.from_bytes(data[2:4], "big")
-        self.__token = int.from_bytes(data[8:12], "big")
 
-        #Parsing Options
+        # Parsing token
 
+        if self.__tk_len == 0:
+            pass
+        elif self.__tk_len < 9:
+            self.__token = int.from_bytes(data[4:4 + self.__tk_len], "big")
+        else:
+            raise Exception("Use of reserved token length values!")
 
+        # Parsing Options (Check RFC7252 page 18 for details)
 
+        if len(data) > 4 + self.__tk_len:
+            index = 4 + self.__tk_len
+            opDeltaPrev = 0
+            while index < len(data):
+                opDelta = (data[index] & 0xF0) >> 4
+                opLen = data[index] & 0x0F
+                opVal = None
+                if opDelta < 13:
+                    opDeltaPrev += opDelta
+                    if opLen < 13:
+                        opVal = data[index + 1:index + 1 + opLen]
+                        index += 1 + opLen
+                    elif opLen == 13:
+                        opLen = data[index + 1] + 13
+                        opVal = data[index + 2:index + 2 + opLen]
+                        index += 2 + opLen
+                    elif opLen == 14:
+                        opLen = int.from_bytes(data[index + 1:index + 3], "big") + 269
+                        opVal = data[index + 3:index + 3 + opLen]
+                        index += 3 + opLen
+                    else:
+                        raise Exception("Invalid option length value!")
+                elif opDelta == 13:
+                    opDeltaPrev += data[index + 1] + 13
+                    if opLen < 13:
+                        opVal = data[index + 2:index + 2 + opLen]
+                        index += 2 + opLen
+                    elif opLen == 13:
+                        opLen = data[index + 2] + 13
+                        opVal = data[index + 3:index + 3 + opLen]
+                        index += 3 + opLen
+                    elif opLen == 14:
+                        opLen = int.from_bytes(data[index + 2:index + 4], "big") + 269
+                        opVal = data[index + 4:index + 4 + opLen]
+                        index += 4 + opLen
+                    else:
+                        raise Exception("Invalid option length value!")
+                elif opDelta == 14:
+                    opDeltaPrev += int.from_bytes(data[index + 1:index + 3], "big") + 269
+                    if opLen < 13:
+                        opVal = data[index + 3:index + 3 + opLen]
+                        index += 3 + opLen
+                    elif opLen == 13:
+                        opLen = data[index + 3] + 13
+                        opVal = data[index + 4:index + 4 + opLen]
+                        index += 4 + opLen
+                    elif opLen == 14:
+                        opLen = int.from_bytes(data[index + 3:index + 5], "big") + 269
+                        opVal = data[index + 5:index + 5 + opLen]
+                        index += 5 + opLen
+                    else:
+                        raise Exception("Invalid option length value!")
+                else:
+                    if opLen == 15:
+                        self.__payload = data[index + 1:len(data)]
+                        break
+                    else:
+                        raise Exception("Invalid option length value!")
 
+                self.addOption(opDeltaPrev, opVal)
 
+            if index < len(data):
+                self.__payload = data[index + 1:len(data)]
