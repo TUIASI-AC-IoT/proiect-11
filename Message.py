@@ -169,9 +169,7 @@ class Message:
 
         #Parsing Options
 
-        if(data[12] & 0xF0 >> 4) < 13:
 
-            #self.__options.append()
 
 
 
