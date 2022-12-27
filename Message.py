@@ -67,31 +67,32 @@ class Options(IntEnum):
 class Message:
     __version = 1
 
-    def __init__(self, msgType, msgClass, msgCode, msgId):
-        self.__msgId = int(random.random()*65535)
+    def __init__(self, msgType, msgClass, msgCode):
         self.__msgType = msgType
         self.__msgClass = msgClass
         self.__msgCode = msgCode
-        self.__token = 666
         self.__options = list()
         self.__payload = bytearray()
+
+        self.__msgId = None #int(random.random() * 65535)
+        self.__token = None
+        self.__tk_len = 0
 
     def encode(self):
         message = bytearray()
 
         # calculate token length
-        tk_len = 0
         if self.__token != 0:
             for i in range(1, 8):
-                if self.__token < 2**(i*8):
-                    tk_len = i
+                if self.__token < 2 ** (i * 8):
+                    self.__tk_len = i
                     break
 
-        message.append(((self.__version << 6) + (self.__msgType << 4) + tk_len))
+        message.append(((self.__version << 6) + (self.__msgType << 4) + self.__tk_len))
         message.append((self.__msgClass << 5) + self.__msgCode)
         for b in self.__msgId.to_bytes(2, 'big'):
             message.append(b)
-        for b in self.__token.to_bytes(tk_len, 'big'):
+        for b in self.__token.to_bytes(self.__tk_len, 'big'):
             message.append(b)
 
         # append options bytes
@@ -150,5 +151,27 @@ class Message:
     def addOption(self, option, value):
         self.__options.append((option, value))
 
-    def addPayload(self, content):
+    def addPayload(self, content: bytearray):
         self.__payload = content
+
+    def decode(self, data: bytearray):
+        if(data[0] & 0xC0 >> 6) != self.__version:
+            raise Exception("Invalid Version")
+
+        self.__msgType = data[0] & 0x30 >> 4
+        self.__tk_len = data[0] & 0x0F
+
+        self.__msgClass = data[1] & 0xE0 >> 5
+        self.__msgCode = data[1] & 0x1F
+
+        self.__msgId = int.from_bytes(data[2:4], "big")
+        self.__token = int.from_bytes(data[8:12], "big")
+
+        #Parsing Options
+
+        if(data[12] & 0xF0 >> 4) < 13:
+
+            #self.__options.append()
+
+
+
