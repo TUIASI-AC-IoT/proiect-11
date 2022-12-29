@@ -1,14 +1,13 @@
-import sys
 import tkinter as tk
 from tkinter import ttk
 from tkinter import simpledialog
-from tkinter import StringVar
+from tkinter import filedialog
 from functools import partial
-import Message as ms
+import CommunicationController as com
 import ControllerCommand as cmd
+import ControllerEvent as ce
 import queue as q
 import threading
-import ControllerEvent as ce
 
 
 class Window(tk.Tk):
@@ -16,6 +15,9 @@ class Window(tk.Tk):
 
     def __init__(self, cmdQueue: q.Queue, eventQueue: q.Queue):
         super().__init__()
+        self.geometry("500x200")
+        self.grid()
+
         # communication queues
         self.__cmdQueue = cmdQueue
         self.__eventQueue = eventQueue
@@ -24,12 +26,6 @@ class Window(tk.Tk):
         self.__eventListener = threading.Thread(target=self.__listenEventQ)
         self.__eventListener.setDaemon(True)
         self.__eventListener.start()
-
-        # send get command for listing root folder
-        self.__cmdQueue.put(cmd.ListFolder(self.__rootFolder))
-
-        self.geometry("500x200")
-        self.grid()
 
         # string list with path folders
         self.__pathString = []
@@ -41,27 +37,31 @@ class Window(tk.Tk):
         self.__menu.pack(anchor="n", fill="x")
 
         # connection type checkbutton
-        self.__commTypeState = tk.IntVar()
-        self.__commType = tk.Checkbutton(self.__menu, text="Confirmable", variable=self.__commTypeState)
+        self.__commTypeVar = tk.IntVar()
+        self.__commType = tk.Checkbutton(self.__menu, text="Non-Confirmable", command=self.__setCommType, variable=self.__commTypeVar)
         self.__commType.grid(column=0, row=0)
 
         # ip label
-        self.__ip = tk.Entry(self.__menu)
+        self.__ipVar = tk.StringVar()
+        self.__ip = tk.Entry(self.__menu, textvariable=self.__ipVar)
+        self.__ip.bind("<FocusOut>", self.__setServerIp)
         self.__ip.configure(width=16)
         self.__ip.grid(column=1, row=0)
 
         # port label
+        self.__portVar = tk.IntVar()
         self.__port = tk.Entry(self.__menu)
+        self.__port.bind("<FocusOut>", self.__setServerPort)
         self.__port.configure(width=6)
         self.__port.grid(column=2, row=0)
 
         # backward button
-        self.__back = tk.Button(self.__menu, text="<-", command=self.__testCb)
+        self.__back = tk.Button(self.__menu, text="<-", command=self.__backwardCB)
         self.__back.grid(column=3, row=0)
 
-        # forward button
-        self.__forward = tk.Button(self.__menu, text="->", command=self.__testCb)
-        self.__forward.grid(column=4, row=0)
+        # refresh button
+        self.__refresh = tk.Button(self.__menu, text="Refresh", command=self.__refreshCB)
+        self.__refresh.grid(column=4, row=0)
 
         # current path label
         self.__path = tk.Label(self.__menu, text="Home/")
@@ -91,61 +91,74 @@ class Window(tk.Tk):
         self.__actions.pack(fill="x", side="bottom")
 
         # upload  file button
-        self.__uploadFile = tk.Button(self.__actions, text="Upload file", command=self.__testCb)
+        self.__uploadFile = tk.Button(self.__actions, text="Upload file", command=self.__uploadFileCB)
         self.__uploadFile.grid(column=0, row=0)
 
         # create folder button
-        self.__createFolder = tk.Button(self.__actions, text="Create folder", command=self.__testCb)
+        self.__createFolder = tk.Button(self.__actions, text="Create folder", command=self.__createFolderCB)
         self.__createFolder.grid(column=1, row=0)
+
+    def __setCommType(self):
+        com.Com_Type = self.__commTypeVar.get()
+
+    def __setServerIp(self, useless):
+        com.serverIp = self.__ipVar.get()
+
+    def __setServerPort(self, useless):
+        com.serverPort = self.__portVar.get()
+
+    def __getCurrentPath(self):
+        tmp = ""
+        for s in self.__pathString:
+            tmp += s
+        return s
+
+    def __refreshCB(self):
+        self.__cmdQueue.put(cmd.ListFolder(self.__getCurrentPath()))
+
+    def __backwardCB(self):
+        if len(self.__pathString) != 1:
+            tmp = ""
+            for s in self.__pathString[0:len(self.__pathString) - 1]:
+                tmp += s
+            self.__cmdQueue.put(cmd.ListFolder(tmp))
 
     def __filePopup(self, event):
         iid = self.__files.identify_row(event.y)
-        name = self.__files.item(iid).get('values')[0]
+        name = self.__files.item(iid).get('values')[1]
         if iid:
             menu = tk.Menu(self, tearoff=0)
-            menu.add_command(label="Rename", command=partial(self.__fileRename, iid, name))
-            menu.add_command(label="Delete", command=partial(self.__fileDelete, iid))
+            menu.add_command(label="Rename", command=partial(self.__fileRename, name))
+            menu.add_command(label="Delete", command=partial(self.__fileDelete, name))
             menu.add_command(label="Move", command=partial(self.__fileMove, name))
+            menu.add_command(label="Details", command=partial(self.__fileDetails, name))
             menu.tk_popup(event.x_root, event.y_root, 0)
-        else:
-            pass
 
-    def __fileRename(self, file_id, name):
+    def __fileRename(self, name):
         new_name = simpledialog.askstring(title=name, prompt='Enter new name: ', initialvalue=name)
-        columns = self.__files.item(file_id).get('values')
-        columns[0] = new_name
-        # TODO send the request, and if successful:
-        if self.__commTypeState.get() == 0:
-            t = ms.Type.Confirmable
-        else:
-            t = ms.Type.NonConfirmable
+        self.__cmdQueue.put(cmd.RenameFile(self.__getCurrentPath() + name, new_name))
 
-        msg = ms.Message(t, ms.Class.Method, ms.Method.PUT)
-        msg.addOption(8, self.__path.cget("text") + name)
-        self.__files.item(file_id, values=columns)
-
-    def __fileDelete(self, file_id):
-        # TODO send the request, and if successful:
-        self.__pathString.append("lol/")
-        tmp = ""
-        for string in self.__pathString:
-            tmp += string
-        self.__path.configure(text=tmp)
-        self.__files.delete(file_id)
+    def __fileDelete(self, name):
+        location = self.__getCurrentPath() + name
+        self.__cmdQueue.put(cmd.DeleteFile(location))
 
     def __fileMove(self, name):
         new_path = simpledialog.askstring(title='Path', prompt='Enter new path: ', initialvalue=self.__pathString)
-        # TODO send the request for update
-        # TODO send the GET request for updated file parent folder
-        self.__pathString.pop()
-        tmp = ""
-        for string in self.__pathString:
-            tmp += string
-        self.__path.configure(text=tmp)
+        new_path += name
+        self.__cmdQueue.put(cmd.MoveFile(new_path))
 
-    def __testCb(self):
-        print(self.__pathString.get())
+    def __fileDetails(self, name):
+        location = self.__getCurrentPath() + name
+        self.__cmdQueue.put(cmd.GetMetadata(location))
 
     def __listenEventQ(self):
-        while self.__running:
+        while True:
             event: ce.ControllerEvent = self.__eventQueue.get()
+
+    def __uploadFileCB(self):
+        file = filedialog.askopenfilename()
+        self.__cmdQueue.put(cmd.UploadFile(self.__getCurrentPath(), file))
+
+    def __createFolderCB(self):
+        name = simpledialog.askstring(title="New folder", prompt='Enter name: ')
+        self.__cmdQueue.put(cmd.CreateFolder(self.__getCurrentPath() + name))

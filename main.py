@@ -17,7 +17,6 @@ def App():
 if __name__ == '__main__':
     commandsQueue = q.Queue()
     eventsQueue = q.Queue()
-
     # App()
     ui = GUI.Window(commandsQueue, eventsQueue)
     ui.title("widuv")
