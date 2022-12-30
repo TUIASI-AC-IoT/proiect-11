@@ -56,10 +56,16 @@ class Options(IntEnum):
     LOCATION_PATH = 8
     URI_PATH = 11
     CONTENT_FORMAT = 12
+    ACCEPT = 17
     BLOCK2 = 23
     BLOCK1 = 27
     # SIZE2 = 28
     # SIZE1 = 60
+
+
+class Content_Format(IntEnum):
+    PLAIN_TEXT = 0  # text/plain; charset=utf-8
+    OCTET_STREAM = 42  # application/octet-stream
 
 
 # Class for managing a CoAP message
@@ -97,13 +103,7 @@ class Message:
         # append options bytes
         prevOption = 0
         for (op, val) in self.__options:
-            if type(val) is str:
-                valLen = len(val)
-            else:
-                for i in range(1, 8):
-                    if val < (1 << (i * 8)):
-                        valLen = i
-                        break
+            valLen = len(val)
 
             if (op - prevOption) < 13:
                 if valLen < 13:
@@ -148,7 +148,21 @@ class Message:
         return message
 
     def addOption(self, option, value):
+        if value is int:
+            value = bytes(value, 'big')
+        if value is str:
+            value = bytes(value, 'ascii')
+
         self.__options.append((option, value))
+
+    def getOptionVal(self, opt: Options):
+        res = None
+        for (op, val) in self.__options:
+            if op == opt:
+                res = val
+                break
+
+        return res
 
     def addPayload(self, content: bytearray):
         self.__payload = content

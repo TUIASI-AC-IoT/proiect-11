@@ -1,7 +1,7 @@
 import socket, queue as q, Message as ms
 import threading, select, random, time
 
-serverIp = '0.0.0.0'
+serverIp = '127.0.0.1'
 serverPort = 5683
 
 # Communication type by default CON
@@ -27,6 +27,7 @@ class CommunicationController:
         #
         self.__reqList = list()
         self.__delayedReq = list()
+        self.__blockWiseReq = list()
         self.__resQueue = q.Queue()
 
     def start(self):
@@ -82,9 +83,54 @@ class CommunicationController:
                             msg_req = msg
                             break
                 if msg_req is None:
-                    return  # No matching request for this repsonse (might be a duplicate from a resolved request)
+                    return  # No matching request for this response (might be a duplicate from a resolved request)
 
-                
+                # supposed req is always a method
+                if msg_req.msgClass != ms.Class.Method:
+                    return
+
+                # Creating events based on request - response types
+
+                if msg_resp.msgClass == ms.Class.Success:
+                    if msg_req.msgCode == ms.Method.GET and msg_resp.msgCode == ms.Success.Content:
+                        if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
+                                          "big") == ms.Content_Format.PLAIN_TEXT:
+                            # Matching for a ListDirectory-event
+
+                            return
+                        if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
+                                          "big") == ms.Content_Format.OCTET_STREAM:
+                            #
+                            return
+
+                    if msg_req.msgCode == ms.Method.POST and msg_resp.msgCode == ms.Success.Created:
+                            #
+                        return
+                    if msg_req.msgCode == ms.Method.PUT and msg_resp.msgCode == ms.Success.Changed:
+
+                        pass
+                    if msg_req.msgCode == ms.Method.DELETE and msg_resp.msgCode == ms.Success.Deleted:
+
+                        pass
+                    if msg_req.msgCode == ms.Method.HEAD and msg_resp.msgCode == ms.Success.Content:
+
+                        pass
+
+                if msg_resp.msgClass == ms.Class.Client_Error or msg_resp.msgClass == ms.Class.Server_Error:
+                    if msg_req.msgCode == ms.Method.GET:
+                        pass
+                    if msg_req.msgCode == ms.Method.POST:
+                        return
+                    if msg_req.msgCode == ms.Method.PUT:
+                        pass
+                    if msg_req.msgCode == ms.Method.DELETE:
+                        pass
+                    if msg_req.msgCode == ms.Method.HEAD:
+                        pass
+
+
+
+
 
 
 
