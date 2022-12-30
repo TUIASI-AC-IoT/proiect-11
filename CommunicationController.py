@@ -1,4 +1,4 @@
-import socket, queue as q, Message as ms
+import socket, queue as q, Message as ms, ControllerEvent as ev
 import threading, select, random, time
 
 serverIp = '127.0.0.1'
@@ -11,7 +11,7 @@ Com_Type = ms.Type.Confirmable
 class CommunicationController:
     __ACK_TIMEOUT = 2  # s
     __MAX_RETRANSMIT = 4
-    __EXTENDED_RESPONSE_TIMEOUT = 5  # s
+    __ACK_RANDOM_FACTOR = 5
 
     __msgIdValue = random.randint(0, 0xFFFF)
     __tknValue = random.randint(0, 0XFFFF_FFFF_FFFF_FFFF)
@@ -23,6 +23,9 @@ class CommunicationController:
         # Communication with GUI queues
         self.__cmdQueue = cmdQueue
         self.__eventQueue = eventQueue
+
+        # sender socket lock
+        self.__sendLock = threading.Lock()
 
         #
         self.__reqList = list()
@@ -36,7 +39,21 @@ class CommunicationController:
         threading.Thread(target=self.resolve_response, daemon=True).start()
 
     def send_request(self, message):
-        self.__sk.sendto(message, (serverIp, serverPort))
+        with self.__sendLock:
+            self.__sk.sendto(message, (serverIp, serverPort))
+
+    def refresh_lifetime(self):
+        while True:
+            for req in self.__reqList:  # req is a tuple of request message, timestamp, timeout and retransmit count
+                if (time.time() - req[1]) > req[2]:
+                    if req[3] > 0:
+                        req[3] -= 1
+                        req[2] *= self.__ACK_RANDOM_FACTOR
+                        req[1] = time.time()
+                    else:
+                        self.__cmdQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_TIMEOUT, req[0]))
+                        self.__reqList.remove(req)
+
 
     def listen_for_command(self):
         while True:
@@ -45,7 +62,7 @@ class CommunicationController:
             msg.setMessageId(33)
             msg.setToken(666)
             self.send_request(msg.encode())
-            self.__reqList.append((msg, time.time(), 0))
+            self.__reqList.append((msg, time.time(), self.__ACK_TIMEOUT, 4))
 
     def receive_responses(self):
         while True:
