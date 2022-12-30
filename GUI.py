@@ -111,7 +111,7 @@ class Window(tk.Tk):
         tmp = ""
         for s in self.__pathString:
             tmp += s
-        return s
+        return tmp
 
     def __refreshCB(self):
         self.__cmdQueue.put(cmd.ListFolder(self.__getCurrentPath()))
@@ -132,6 +132,8 @@ class Window(tk.Tk):
             menu.add_command(label="Delete", command=partial(self.__fileDelete, name))
             menu.add_command(label="Move", command=partial(self.__fileMove, name))
             menu.add_command(label="Details", command=partial(self.__fileDetails, name))
+            if self.__files.item(iid).get('values')[0] == 0:
+                menu.add_command(label="Download", command=partial(self.__fileDownload, name))
             menu.tk_popup(event.x_root, event.y_root, 0)
 
     def __fileRename(self, name):
@@ -150,6 +152,10 @@ class Window(tk.Tk):
     def __fileDetails(self, name):
         location = self.__getCurrentPath() + name
         self.__cmdQueue.put(cmd.GetMetadata(location))
+
+    def __fileDownload(self, name):
+        location = self.__getCurrentPath() + name
+        self.__cmdQueue.put(cmd.DownloadFile(location))
 
     def __listenEventQ(self):
         while True:
