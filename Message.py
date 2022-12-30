@@ -167,6 +167,9 @@ class Message:
     def addPayload(self, content: bytearray):
         self.__payload = content
 
+    def getPayload(self):
+        return self.__payload
+
     def setMessageId(self, msgId):
         self.msgId = msgId
 

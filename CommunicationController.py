@@ -51,7 +51,7 @@ class CommunicationController:
                         req[2] *= self.__ACK_RANDOM_FACTOR
                         req[1] = time.time()
                     else:
-                        self.__cmdQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_TIMEOUT, req[0]))
+                        self.__cmdQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_TIMEOUT, ms.Method(req[0].msgCode).name))
                         self.__reqList.remove(req)
 
 
@@ -109,41 +109,67 @@ class CommunicationController:
                 # Creating events based on request - response types
 
                 if msg_resp.msgClass == ms.Class.Success:
-                    if msg_req.msgCode == ms.Method.GET and msg_resp.msgCode == ms.Success.Content:
+                    if (msg_req.msgCode == ms.Method.PUT or msg_req.msgCode == ms.Method.GET) and msg_resp.msgCode == ms.Success.Content:
                         if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           "big") == ms.Content_Format.PLAIN_TEXT:
-                            # Matching for a ListDirectory-event
 
+                            # Matching for a ListDirectory-event
+                            file_list = list()
+                            index = 0
+                            data = msg_resp.getPayload()
+                            while index < len(data):
+                                val_len = (data[index] & 0xfe) >> 1
+                                file_type = data[index] & 0x01
+                                name = data[index+1:index+1+val_len].decode("ascii")
+                                file_list.append((file_type, name))
+                                index += 1 + val_len
+
+                            self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_LIST, file_list))
                             return
                         if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           "big") == ms.Content_Format.OCTET_STREAM:
-                            #
+                            # Matching for a FileDownloaded-event
+                            self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_CONTENT, msg_resp.getPayload()))
                             return
 
                     if msg_req.msgCode == ms.Method.POST and msg_resp.msgCode == ms.Success.Created:
-                            #
-                        return
-                    if msg_req.msgCode == ms.Method.PUT and msg_resp.msgCode == ms.Success.Changed:
+                        # Matching for a FolderCreated-event
+                        if int.from_bytes(msg_req.getOptionVal(ms.Options.CONTENT_FORMAT),
+                                          'big') == ms.Content_Format.PLAIN_TEXT:
+                            event = ev.ControllerEvent(ev.EventType.FOLDER_CREATED,
+                                                       msg_resp.getOptionVal(ms.Options.LOCATION_PATH).decode("ascii"))
+                        # Matching for a FileUploaded-event
+                        else:
+                            event = ev.ControllerEvent(ev.EventType.FILE_UPLOADED,
+                                                       msg_resp.getOptionVal(ms.Options.LOCATION_PATH).decode("ascii"))
 
+                        self.__eventQueue.put(event)
+                        return
+
+                    if msg_req.msgCode == ms.Method.PUT and msg_resp.msgCode == ms.Success.Changed:
+                        # Matching for a FileRenamed-event
+                        event = ev.ControllerEvent(ev.EventType.FILE_RENAMED, msg_req.getPayload().decode("ascii"))
+                        self.__eventQueue.put(event)
                         pass
                     if msg_req.msgCode == ms.Method.DELETE and msg_resp.msgCode == ms.Success.Deleted:
-
+                        # Matching for a FileDeleted-event
+                        uri = msg_resp.getOptionVal(ms.Options.LOCATION_PATH).decode("ascii")
+                        event = ev.ControllerEvent(ev.EventType.FILE_DELETED, uri)
+                        self.__eventQueue.put(event)
                         pass
                     if msg_req.msgCode == ms.Method.HEAD and msg_resp.msgCode == ms.Success.Content:
-
+                        # Matching for a FileHeader-event
+                        # Waiting for server to specify request and response format
+                        # TODO wait...
                         pass
 
-                if msg_resp.msgClass == ms.Class.Client_Error or msg_resp.msgClass == ms.Class.Server_Error:
-                    if msg_req.msgCode == ms.Method.GET:
-                        pass
-                    if msg_req.msgCode == ms.Method.POST:
-                        return
-                    if msg_req.msgCode == ms.Method.PUT:
-                        pass
-                    if msg_req.msgCode == ms.Method.DELETE:
-                        pass
-                    if msg_req.msgCode == ms.Method.HEAD:
-                        pass
+                if msg_resp.msgClass == ms.Class.Client_Error:
+                    err_msg = ms.Client_Error(msg_resp.msgCode).name
+                else:
+                    err_msg = ms.Server_Error(msg_resp.msgCode).name
+
+                prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
+                self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
 
 
 

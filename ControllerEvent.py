@@ -5,9 +5,12 @@ class EventType(IntEnum):
     FILE_LIST = 0
     FILE_CONTENT = 1
     FILE_HEADER = 2
-    USER_ERROR = 3
-    SERVER_ADDRESS_ERROR = 4
-    REQUEST_TIMEOUT = 5
+    FOLDER_CREATED = 3
+    FILE_UPLOADED = 4
+    FILE_RENAMED = 5
+    FILE_DELETED = 6
+    REQUEST_FAILED = 7
+    REQUEST_TIMEOUT = 8
 
 
 class ControllerEvent:
