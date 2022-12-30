@@ -1,5 +1,6 @@
 import random
 import GUI
+import CommunicationController as ComC
 import queue as q
 
 import CommunicationController as sv, Message as ms
@@ -17,7 +18,11 @@ def App():
 if __name__ == '__main__':
     commandsQueue = q.Queue()
     eventsQueue = q.Queue()
-    # App()
+    # Communication part
+    cc = ComC.CommunicationController(commandsQueue, eventsQueue)
+    cc.start()
+
+    # Interface part
     ui = GUI.Window(commandsQueue, eventsQueue)
     ui.title("widuv")
     ui.mainloop()

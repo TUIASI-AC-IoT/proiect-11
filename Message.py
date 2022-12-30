@@ -1,4 +1,3 @@
-import random
 from enum import IntEnum
 
 
@@ -67,32 +66,32 @@ class Options(IntEnum):
 class Message:
     __version = 1
 
-    def __init__(self, msgType, msgClass, msgCode):
-        self.__msgType = msgType
-        self.__msgClass = msgClass
-        self.__msgCode = msgCode
+    def __init__(self, msgType=None, msgClass=None, msgCode=None):
+        self.msgType = msgType
+        self.msgClass = msgClass
+        self.msgCode = msgCode
         self.__options = list()
         self.__payload = bytearray()
 
-        self.__msgId = None #int(random.random() * 65535)
-        self.__token = None
-        self.__tk_len = 0
+        self.msgId = None
+        self.token = None
+        self.tk_len = 0
 
     def encode(self):
         message = bytearray()
 
         # calculate token length
-        if self.__token != 0:
+        if self.token != 0:
             for i in range(1, 8):
-                if self.__token < 2 ** (i * 8):
-                    self.__tk_len = i
+                if self.token < (1 << (i * 8)):
+                    self.tk_len = i
                     break
 
-        message.append(((self.__version << 6) + (self.__msgType << 4) + self.__tk_len))
-        message.append((self.__msgClass << 5) + self.__msgCode)
-        for b in self.__msgId.to_bytes(2, 'big'):
+        message.append(((self.__version << 6) + (self.msgType << 4) + self.tk_len))
+        message.append((self.msgClass << 5) + self.msgCode)
+        for b in self.msgId.to_bytes(2, 'big'):
             message.append(b)
-        for b in self.__token.to_bytes(self.__tk_len, 'big'):
+        for b in self.token.to_bytes(self.tk_len, 'big'):
             message.append(b)
 
         # append options bytes
@@ -102,7 +101,7 @@ class Message:
                 valLen = len(val)
             else:
                 for i in range(1, 8):
-                    if val < 2 ** (i * 8):
+                    if val < (1 << (i * 8)):
                         valLen = i
                         break
 
@@ -154,32 +153,37 @@ class Message:
     def addPayload(self, content: bytearray):
         self.__payload = content
 
-    def decode(self, data: bytearray):
+    def setMessageId(self, msgId):
+        self.msgId = msgId
+
+    def setToken(self, tkn):
+        self.token = tkn
+
+    def decode(self, data: bytes):
         if ((data[0] & 0xC0) >> 6) != self.__version:
             print(data[0] & 0xC0 >> 6)
             raise Exception("Invalid Version")
 
-        self.__msgType = (data[0] & 0x30) >> 4
-        self.__tk_len = data[0] & 0x0F
+        self.msgType = (data[0] & 0x30) >> 4
+        self.tk_len = data[0] & 0x0F
 
-        self.__msgClass = (data[1] & 0xE0) >> 5
-        self.__msgCode = data[1] & 0x1F
+        self.msgClass = (data[1] & 0xE0) >> 5
+        self.msgCode = data[1] & 0x1F
 
-        self.__msgId = int.from_bytes(data[2:4], "big")
+        self.msgId = int.from_bytes(data[2:4], "big")
 
         # Parsing token
 
-        if self.__tk_len == 0:
+        if self.tk_len == 0:
             pass
-        elif self.__tk_len < 9:
-            self.__token = int.from_bytes(data[4:4 + self.__tk_len], "big")
+        elif self.tk_len < 9:
+            self.token = int.from_bytes(data[4:4 + self.tk_len], "big")
         else:
             raise Exception("Use of reserved token length values!")
 
         # Parsing Options (Check RFC7252 page 18 for details)
-
-        if len(data) > 4 + self.__tk_len:
-            index = 4 + self.__tk_len
+        if len(data) > 4 + self.tk_len:
+            index = 4 + self.tk_len
             opDeltaPrev = 0
             while index < len(data):
                 opDelta = (data[index] & 0xF0) >> 4
