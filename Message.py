@@ -188,11 +188,11 @@ class Message:
         self.msgId = int.from_bytes(data[2:4], "big")
 
         # Parsing token
-
         if self.tk_len == 0:
             pass
         elif self.tk_len < 9:
-            self.token = int.from_bytes(data[4:4 + self.tk_len], "big")
+            for byte in bytes[4:4 + self.tk_len]:
+                self.token = (self.token << 8) | byte
         else:
             raise Exception("Use of reserved token length values!")
 
