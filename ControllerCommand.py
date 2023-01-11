@@ -16,7 +16,7 @@ class CreateFolder(ControllerCommand):
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.POST)
         for p in path:
             self._message.addOption(ms.Options.URI_PATH, p)
-        self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.PLAIN_TEXT)
+        self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.PLAIN_TEXT.value)
 
 
 class UploadFile(ControllerCommand):
@@ -25,7 +25,7 @@ class UploadFile(ControllerCommand):
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.POST)
         for p in path:
             self._message.addOption(ms.Options.URI_PATH, p)
-        self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.OCTET_STREAM)
+        self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.OCTET_STREAM.value)
 
 
 class RenameFile(ControllerCommand):

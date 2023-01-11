@@ -115,34 +115,36 @@ class Window(tk.Tk):
             menu.add_command(label="Delete", command=partial(self.__fileDelete, name))
             menu.add_command(label="Move", command=partial(self.__fileMove, name))
             menu.add_command(label="Details", command=partial(self.__fileDetails, name))
-            if self.__files.item(iid).get('values')[0] == 0:
+            if self.__files.item(iid).get('values')[0] == 1:
                 menu.add_command(label="Download", command=partial(self.__fileDownload, name))
-            menu.tk_popup(event.x_root, event.y_root, 0)
+            menu.tk_popup(event.x_root, event.y_root, 1)
 
     def __fileRename(self, name):
         new_name = simpledialog.askstring(title=name, prompt='Enter new name: ', initialvalue=name)
-        uri = self.__pathString
-        uri.append(name)
-        self.__cmdQueue.put(cmd.RenameFile(uri, new_name))
+        if new_name is not None:
+            uri = self.__pathString.copy()
+            uri.append(name)
+            self.__cmdQueue.put(cmd.RenameFile(uri, new_name))
 
     def __fileDelete(self, name):
-        uri = self.__pathString
+        uri = self.__pathString.copy()
         uri.append(name)
         self.__cmdQueue.put(cmd.DeleteFile(uri))
 
     def __fileMove(self, name):
-        new_path = simpledialog.askstring(title='Path', prompt='Enter new path with /: ', initialvalue=self.__pathString)
-        uri: list = new_path.split('/')
-        uri.append(name)
-        self.__cmdQueue.put(cmd.MoveFile(uri))
+        new_path = simpledialog.askstring(title='Path', prompt='Enter new path with /: ')
+        if new_path is not None:
+            uri: list = new_path.split('/')
+            uri.append(name)
+            self.__cmdQueue.put(cmd.MoveFile(uri))
 
     def __fileDetails(self, name):
-        uri = self.__pathString
+        uri = self.__pathString.copy()
         uri.append(name)
         self.__cmdQueue.put(cmd.GetMetadata(uri))
 
     def __fileDownload(self, name):
-        uri = self.__pathString
+        uri = self.__pathString.copy()
         uri.append(name)
         self.__cmdQueue.put(cmd.DownloadFile(uri))
 
@@ -157,12 +159,16 @@ class Window(tk.Tk):
                 for i in event.data:
                     self.__files.insert('', tk.END, values=i)
 
+            self.__eventQueue.task_done()
+
     def __uploadFileCB(self):
         file = filedialog.askopenfilename()
-        self.__cmdQueue.put(cmd.UploadFile(self.__pathString, file))
+        if file != "":
+            self.__cmdQueue.put(cmd.UploadFile(self.__pathString, file))
 
     def __createFolderCB(self):
         name = simpledialog.askstring(title="New folder", prompt='Enter name: ')
-        uri = self.__pathString
-        uri.append(name)
-        self.__cmdQueue.put(cmd.CreateFolder(uri))
+        if name is not None:
+            uri = self.__pathString.copy()
+            uri.append(name)
+            self.__cmdQueue.put(cmd.CreateFolder(uri))

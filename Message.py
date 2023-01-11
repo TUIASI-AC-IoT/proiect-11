@@ -101,7 +101,16 @@ class Message:
         # append options bytes
         prevOption = 0
         for (op, val) in self.__options:
-            valLen = len(val)
+            valLen = 0
+            # print(type(val.value))
+            if type(val) is int:
+                if val != 0:
+                    l_val = val
+                    while l_val > 0:
+                        l_val = l_val >> 8
+                        valLen = valLen + 1
+            else:
+                valLen = len(val)
 
             if (op - prevOption) < 13:
                 if valLen < 13:
@@ -191,7 +200,8 @@ class Message:
         if self.tk_len == 0:
             pass
         elif self.tk_len < 9:
-            for byte in bytes[4:4 + self.tk_len]:
+            self.token = 0
+            for byte in data[4:4 + self.tk_len]:
                 self.token = (self.token << 8) | byte
         else:
             raise Exception("Use of reserved token length values!")
