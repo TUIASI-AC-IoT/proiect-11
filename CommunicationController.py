@@ -16,7 +16,7 @@ class CommunicationController:
     __ACK_RANDOM_FACTOR = 5
 
     __msgIdValue = random.randint(0, 0xFFFF)
-    __tknValue = random.randint(0, 0XFFFF_FFFF)
+    __tknValue = random.randint(0, 0XFFFF_FFFF_FFFF)
 
     def __init__(self, cmdQueue: q.Queue, eventQueue: q.Queue):
         self.__sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -31,6 +31,8 @@ class CommunicationController:
 
         #
         self.__reqList = list()
+
+        #
         self.__delayedReq = list()
         self.__blockWiseReq = list()
         self.__resQueue = q.Queue()
@@ -127,7 +129,6 @@ class CommunicationController:
                                 name = data[index+1:index+1+val_len].decode("ascii")
                                 file_list.append((file_type, name))
                                 index += 1 + val_len
-
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_LIST, file_list))
                             return
                         if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),

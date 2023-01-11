@@ -76,7 +76,7 @@ class Message:
         self.msgType = msgType
         self.msgClass = msgClass
         self.msgCode = msgCode
-        self.options = list()
+        self.__options = list()
         self.__payload = bytearray()
 
         self.msgId = None
@@ -88,21 +88,19 @@ class Message:
 
         # calculate token length
         if self.token != 0:
-            for i in range(1, 8):
-                if self.token < (1 << (i * 8)):
-                    self.tk_len = i
-                    break
+            l_token = self.token
+            while l_token > 0 and self.tk_len <= 8:
+                l_token = l_token >> 8
+                self.tk_len = self.tk_len + 1
 
         message.append(((self.__version << 6) + (self.msgType << 4) + self.tk_len))
         message.append((self.msgClass << 5) + self.msgCode)
-        for b in self.msgId.to_bytes(2, 'big'):
-            message.append(b)
-        for b in self.token.to_bytes(self.tk_len, 'big'):
-            message.append(b)
+        message.extend(self.msgId.to_bytes(2, 'big'))
+        message.extend(self.token.to_bytes(self.tk_len, 'big'))
 
         # append options bytes
         prevOption = 0
-        for (op, val) in self.options:
+        for (op, val) in self.__options:
             valLen = len(val)
 
             if (op - prevOption) < 13:
@@ -153,11 +151,11 @@ class Message:
         if value is str:
             value = bytes(value, 'ascii')
 
-        self.options.append((option, value))
+        self.__options.append((option, value))
 
     def getOptionVal(self, opt: Options):
         res = None
-        for (op, val) in self.options:
+        for (op, val) in self.__options:
             if op == opt:
                 res = val
                 break
@@ -194,9 +192,7 @@ class Message:
         if self.tk_len == 0:
             pass
         elif self.tk_len < 9:
-            self.token = 0
-            for byte in data[4:4 + self.tk_len]:
-                self.token = (self.token << 8) | byte
+            self.token = int.from_bytes(data[4:4 + self.tk_len], "big")
         else:
             raise Exception("Use of reserved token length values!")
 
