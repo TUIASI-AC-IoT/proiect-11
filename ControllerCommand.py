@@ -14,7 +14,8 @@ class CreateFolder(ControllerCommand):
     def __init__(self, path):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.POST)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
+        self._message.addOption(ms.Options.URI_PATH, path)
+        self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.PLAIN_TEXT)
 
 
 class UploadFile(ControllerCommand):
@@ -29,7 +30,7 @@ class RenameFile(ControllerCommand):
     def __init__(self, path, newName):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.PUT)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
+        self._message.addOption(ms.Options.URI_PATH, path)
         self._message.addPayload(bytearray(newName, 'ascii'))
 
 
@@ -45,21 +46,21 @@ class DeleteFile(ControllerCommand):
     def __init__(self, path):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.DELETE)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
+        self._message.addOption(ms.Options.URI_PATH, path)
 
 
 class ListFolder(ControllerCommand):
     def __init__(self, path):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.GET)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
+        self._message.addOption(ms.Options.URI_PATH, path)
 
 
 class DownloadFile(ControllerCommand):
     def __init__(self, path):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.GET)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
+        self._message.addOption(ms.Options.URI_PATH, path)
 
 
 class GetMetadata(ControllerCommand):

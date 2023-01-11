@@ -76,7 +76,7 @@ class Message:
         self.msgType = msgType
         self.msgClass = msgClass
         self.msgCode = msgCode
-        self.__options = list()
+        self.options = list()
         self.__payload = bytearray()
 
         self.msgId = None
@@ -102,7 +102,7 @@ class Message:
 
         # append options bytes
         prevOption = 0
-        for (op, val) in self.__options:
+        for (op, val) in self.options:
             valLen = len(val)
 
             if (op - prevOption) < 13:
@@ -153,11 +153,11 @@ class Message:
         if value is str:
             value = bytes(value, 'ascii')
 
-        self.__options.append((option, value))
+        self.options.append((option, value))
 
     def getOptionVal(self, opt: Options):
         res = None
-        for (op, val) in self.__options:
+        for (op, val) in self.options:
             if op == opt:
                 res = val
                 break
@@ -194,7 +194,9 @@ class Message:
         if self.tk_len == 0:
             pass
         elif self.tk_len < 9:
-            self.token = int.from_bytes(data[4:4 + self.tk_len], "big")
+            self.token = 0
+            for byte in data[4:4 + self.tk_len]:
+                self.token = (self.token << 8) | byte
         else:
             raise Exception("Use of reserved token length values!")
 

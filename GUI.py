@@ -11,7 +11,7 @@ import threading
 
 
 class Window(tk.Tk):
-    __rootFolder = "Home/"
+    __rootFolder = "path"
 
     def __init__(self, cmdQueue: q.Queue, eventQueue: q.Queue):
         super().__init__()
@@ -64,7 +64,7 @@ class Window(tk.Tk):
         self.__refresh.grid(column=4, row=0)
 
         # current path label
-        self.__path = tk.Label(self.__menu, text="Home/")
+        self.__path = tk.Label(self.__menu, text="path")
         self.__path.grid(column=5, row=0)
 
         # files list
@@ -97,6 +97,8 @@ class Window(tk.Tk):
         # create folder button
         self.__createFolder = tk.Button(self.__actions, text="Create folder", command=self.__createFolderCB)
         self.__createFolder.grid(column=1, row=0)
+
+        self.__cmdQueue.put(cmd.ListFolder(""))
 
     def __setCommType(self):
         com.Com_Type = self.__commTypeVar.get()
@@ -161,6 +163,10 @@ class Window(tk.Tk):
         while True:
             event: ce.ControllerEvent = self.__eventQueue.get()
 
+            if event.eventType == ce.EventType.FILE_LIST:
+                for item in self.__files.get_children():
+                    self.__files.delete(item)
+                self.__files.insert(event.data)
     def __uploadFileCB(self):
         file = filedialog.askopenfilename()
         self.__cmdQueue.put(cmd.UploadFile(self.__getCurrentPath(), file))

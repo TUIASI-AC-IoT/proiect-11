@@ -4,6 +4,8 @@ import threading, select, random, time
 serverIp = '127.0.0.1'
 serverPort = 5683
 
+clientPort = 25575
+
 # Communication type by default CON
 Com_Type = ms.Type.Confirmable
 
@@ -14,11 +16,11 @@ class CommunicationController:
     __ACK_RANDOM_FACTOR = 5
 
     __msgIdValue = random.randint(0, 0xFFFF)
-    __tknValue = random.randint(0, 0XFFFF_FFFF_FFFF_FFFF)
+    __tknValue = random.randint(0, 0XFFFF_FFFF)
 
     def __init__(self, cmdQueue: q.Queue, eventQueue: q.Queue):
         self.__sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self.__sk.bind(('0.0.0.0', 5683))
+        self.__sk.bind(('0.0.0.0', clientPort))
 
         # Communication with GUI queues
         self.__cmdQueue = cmdQueue
@@ -59,8 +61,10 @@ class CommunicationController:
         while True:
             command = self.__cmdQueue.get()
             msg: ms.Message = command.getDetails()
-            msg.setMessageId(33)
-            msg.setToken(666)
+            msg.setMessageId(self.__msgIdValue)
+            self.__msgIdValue = self.__msgIdValue + 1
+            msg.setToken(self.__tknValue)
+            self.__tknValue = self.__tknValue + 1
             self.send_request(msg.encode())
             self.__reqList.append((msg, time.time(), self.__ACK_TIMEOUT, 4))
 
@@ -81,8 +85,8 @@ class CommunicationController:
             # Searching to associate a response with a request
             if msg_resp.tk_len == 0:
                 for msg in self.__reqList:
-                    if msg_resp.msgId == msg.msgId:
-                        msg_req = msg
+                    if msg_resp.msgId == msg[0].msgId:
+                        msg_req = msg[0]
                         break
                 if msg_req is not None:
                     if msg_resp.msgType == ms.Type.Acknowledgement:
@@ -91,8 +95,8 @@ class CommunicationController:
                 return
             else:
                 for msg in self.__reqList:
-                    if msg_resp.token == msg.token:
-                        msg_req = msg
+                    if msg_resp.token == msg[0].token:
+                        msg_req = msg[0]
                         break
                 if msg_req is None: # Might be a response from a delayed request
                     for msg in self.__delayedReq:
