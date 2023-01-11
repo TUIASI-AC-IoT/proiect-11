@@ -171,6 +171,14 @@ class Message:
 
         return res
 
+    def getOptionValList(self, opt: Options):
+        res = list()
+        for (op, val) in self.__options:
+            if op == opt:
+                res.append(val)
+
+        return res
+
     def addPayload(self, content: bytearray):
         self.__payload = content
 
