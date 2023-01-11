@@ -11,8 +11,6 @@ import threading
 
 
 class Window(tk.Tk):
-    __rootFolder = "path"
-
     def __init__(self, cmdQueue: q.Queue, eventQueue: q.Queue):
         super().__init__()
         self.geometry("500x200")
@@ -29,7 +27,7 @@ class Window(tk.Tk):
 
         # string list with path folders
         self.__pathString = []
-        self.__pathString.append(self.__rootFolder)
+        self.__pathString.append("")
 
         # upper menu frame
         self.__menu = tk.Frame(self, highlightbackground="black", highlightthickness=1)
@@ -64,7 +62,7 @@ class Window(tk.Tk):
         self.__refresh.grid(column=4, row=0)
 
         # current path label
-        self.__path = tk.Label(self.__menu, text="path")
+        self.__path = tk.Label(self.__menu, text="")
         self.__path.grid(column=5, row=0)
 
         # files list
@@ -75,14 +73,6 @@ class Window(tk.Tk):
         self.__files.configure(yscrollcommand=self.__scroll.set)
         self.__scroll.pack(side="right", fill="y")
         self.__files.pack(fill="both", expand=True)
-        self.__files.insert('', tk.END, values=(0, "file1"))
-        self.__files.insert('', tk.END, values=(0, "file2"))
-        self.__files.insert('', tk.END, values=(1, "file3"))
-        self.__files.insert('', tk.END, values=(0, "file4"))
-        self.__files.insert('', tk.END, values=(0, "file5"))
-        self.__files.insert('', tk.END, values=(0, "file6"))
-        self.__files.insert('', tk.END, values=(0, "file7"))
-        self.__files.insert('', tk.END, values=(1, "file8"))
 
         self.__files.bind("<ButtonRelease-3>", self.__filePopup)
 
@@ -98,7 +88,7 @@ class Window(tk.Tk):
         self.__createFolder = tk.Button(self.__actions, text="Create folder", command=self.__createFolderCB)
         self.__createFolder.grid(column=1, row=0)
 
-        self.__cmdQueue.put(cmd.ListFolder(""))
+        self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
 
     def __setCommType(self):
         com.Com_Type = self.__commTypeVar.get()
@@ -109,21 +99,12 @@ class Window(tk.Tk):
     def __setServerPort(self, useless):
         com.serverPort = self.__portVar.get()
 
-    def __getCurrentPath(self):
-        tmp = ""
-        for s in self.__pathString:
-            tmp += s
-        return tmp
-
     def __refreshCB(self):
-        self.__cmdQueue.put(cmd.ListFolder(self.__getCurrentPath()))
+        self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
 
     def __backwardCB(self):
         if len(self.__pathString) != 1:
-            tmp = ""
-            for s in self.__pathString[0:len(self.__pathString) - 1]:
-                tmp += s
-            self.__cmdQueue.put(cmd.ListFolder(tmp))
+            self.__cmdQueue.put(cmd.ListFolder(self.__pathString[0:len(self.__pathString) - 1]))
 
     def __filePopup(self, event):
         iid = self.__files.identify_row(event.y)
@@ -140,24 +121,30 @@ class Window(tk.Tk):
 
     def __fileRename(self, name):
         new_name = simpledialog.askstring(title=name, prompt='Enter new name: ', initialvalue=name)
-        self.__cmdQueue.put(cmd.RenameFile(self.__getCurrentPath() + name, new_name))
+        uri = self.__pathString
+        uri.append(name)
+        self.__cmdQueue.put(cmd.RenameFile(uri, new_name))
 
     def __fileDelete(self, name):
-        location = self.__getCurrentPath() + name
-        self.__cmdQueue.put(cmd.DeleteFile(location))
+        uri = self.__pathString
+        uri.append(name)
+        self.__cmdQueue.put(cmd.DeleteFile(uri))
 
     def __fileMove(self, name):
-        new_path = simpledialog.askstring(title='Path', prompt='Enter new path: ', initialvalue=self.__pathString)
-        new_path += name
-        self.__cmdQueue.put(cmd.MoveFile(new_path))
+        new_path = simpledialog.askstring(title='Path', prompt='Enter new path with /: ', initialvalue=self.__pathString)
+        uri: list = new_path.split('/')
+        uri.append(name)
+        self.__cmdQueue.put(cmd.MoveFile(uri))
 
     def __fileDetails(self, name):
-        location = self.__getCurrentPath() + name
-        self.__cmdQueue.put(cmd.GetMetadata(location))
+        uri = self.__pathString
+        uri.append(name)
+        self.__cmdQueue.put(cmd.GetMetadata(uri))
 
     def __fileDownload(self, name):
-        location = self.__getCurrentPath() + name
-        self.__cmdQueue.put(cmd.DownloadFile(location))
+        uri = self.__pathString
+        uri.append(name)
+        self.__cmdQueue.put(cmd.DownloadFile(uri))
 
     def __listenEventQ(self):
         while True:
@@ -166,11 +153,16 @@ class Window(tk.Tk):
             if event.eventType == ce.EventType.FILE_LIST:
                 for item in self.__files.get_children():
                     self.__files.delete(item)
-                self.__files.insert(event.data)
+
+                for i in event.data:
+                    self.__files.insert('', tk.END, values=i)
+
     def __uploadFileCB(self):
         file = filedialog.askopenfilename()
-        self.__cmdQueue.put(cmd.UploadFile(self.__getCurrentPath(), file))
+        self.__cmdQueue.put(cmd.UploadFile(self.__pathString, file))
 
     def __createFolderCB(self):
         name = simpledialog.askstring(title="New folder", prompt='Enter name: ')
-        self.__cmdQueue.put(cmd.CreateFolder(self.__getCurrentPath() + name))
+        uri = self.__pathString
+        uri.append(name)
+        self.__cmdQueue.put(cmd.CreateFolder(uri))

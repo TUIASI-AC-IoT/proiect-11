@@ -11,60 +11,68 @@ class ControllerCommand:
 
 
 class CreateFolder(ControllerCommand):
-    def __init__(self, path):
+    def __init__(self, path: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.POST)
-        self._message.addOption(ms.Options.URI_PATH, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
         self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.PLAIN_TEXT)
 
 
 class UploadFile(ControllerCommand):
-    def __init__(self, path, file):
+    def __init__(self, path: list, file):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.POST)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
-        # self._message.addOption(ms.Options.CONTENT_FORMAT, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
+        self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.OCTET_STREAM)
 
 
 class RenameFile(ControllerCommand):
-    def __init__(self, path, newName):
+    def __init__(self, path: list, newName):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.PUT)
-        self._message.addOption(ms.Options.URI_PATH, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
         self._message.addPayload(bytearray(newName, 'ascii'))
 
 
 class MoveFile(ControllerCommand):
-    def __init__(self, path):
+    def __init__(self, path: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.PUT)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
-        # Maybe Uri change with Location
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
 
 
 class DeleteFile(ControllerCommand):
-    def __init__(self, path):
+    def __init__(self, path: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.DELETE)
-        self._message.addOption(ms.Options.URI_PATH, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
 
 
 class ListFolder(ControllerCommand):
-    def __init__(self, path):
+    def __init__(self, path: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.GET)
-        self._message.addOption(ms.Options.URI_PATH, path)
+        # self._message.addOption(ms.Options.URI_PATH, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
 
 
 class DownloadFile(ControllerCommand):
-    def __init__(self, path):
+    def __init__(self, path: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.GET)
-        self._message.addOption(ms.Options.URI_PATH, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
 
 
 class GetMetadata(ControllerCommand):
-    def __init__(self, path):
+    def __init__(self, path: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.HEAD)
-        self._message.addOption(ms.Options.LOCATION_PATH, path)
+        for p in path:
+            self._message.addOption(ms.Options.URI_PATH, p)
