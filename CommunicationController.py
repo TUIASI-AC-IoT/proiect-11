@@ -9,11 +9,15 @@ clientPort = 25575
 # Communication type by default CON
 Com_Type = ms.Type.Confirmable
 
+# default path were files would be stored
+DownloadPath = "~/Downloads"
+
 
 class CommunicationController:
     __ACK_TIMEOUT = 2  # s
     __MAX_RETRANSMIT = 4
     __ACK_RANDOM_FACTOR = 5
+    __MAX_SZX = 6
 
     __msgIdValue = random.randint(0, 0xFFFF)
     __tknValue = random.randint(0, 0XFFFF_FFFF_FFFF)
@@ -55,9 +59,9 @@ class CommunicationController:
                         req[2] *= self.__ACK_RANDOM_FACTOR
                         req[1] = time.time()
                     else:
-                        self.__cmdQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_TIMEOUT, ms.Method(req[0].msgCode).name))
+                        self.__cmdQueue.put(
+                            ev.ControllerEvent(ev.EventType.REQUEST_TIMEOUT, ms.Method(req[0].msgCode).name))
                         self.__reqList.remove(req)
-
 
     def listen_for_command(self):
         while True:
@@ -69,6 +73,8 @@ class CommunicationController:
             self.__tknValue = self.__tknValue + 1
             self.send_request(msg.encode())
             self.__reqList.append((msg, time.time(), self.__ACK_TIMEOUT, 4))
+
+            self.__cmdQueue.task_done()
 
     def receive_responses(self):
         while True:
@@ -100,7 +106,7 @@ class CommunicationController:
                     if msg_resp.token == msg[0].token:
                         msg_req = msg[0]
                         break
-                if msg_req is None: # Might be a response from a delayed request
+                if msg_req is None:  # Might be a response from a delayed request
                     for msg in self.__delayedReq:
                         if msg_resp.token == msg.token:
                             msg_req = msg
@@ -115,7 +121,8 @@ class CommunicationController:
                 # Creating events based on request - response types
 
                 if msg_resp.msgClass == ms.Class.Success:
-                    if (msg_req.msgCode == ms.Method.PUT or msg_req.msgCode == ms.Method.GET) and msg_resp.msgCode == ms.Success.Content:
+                    if (
+                            msg_req.msgCode == ms.Method.PUT or msg_req.msgCode == ms.Method.GET) and msg_resp.msgCode == ms.Success.Content:
                         if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           "big") == ms.Content_Format.PLAIN_TEXT:
 
@@ -126,7 +133,7 @@ class CommunicationController:
                             while index < len(data):
                                 val_len = (data[index] & 0xfe) >> 1
                                 file_type = data[index] & 0x01
-                                name = data[index+1:index+1+val_len].decode("ascii")
+                                name = data[index + 1:index + 1 + val_len].decode("ascii")
                                 file_list.append((file_type, name))
                                 index += 1 + val_len
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_LIST, file_list))
@@ -176,9 +183,4 @@ class CommunicationController:
                 prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
                 self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
 
-
-
-
-
-
-
+            self.__resQueue.task_done()
