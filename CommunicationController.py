@@ -1,6 +1,8 @@
 import socket, queue as q, Message as ms, ControllerEvent as ev
 import threading, select, random, time
 
+import ControllerCommand
+
 serverIp = '127.0.0.1'
 serverPort = 5683
 
@@ -69,6 +71,7 @@ class CommunicationController:
     def listen_for_command(self):
         while True:
             command = self.__cmdQueue.get()
+
             msg: ms.Message = command.getDetails()
             msg.setMessageId(self.__msgIdValue)
             self.__msgIdValue = self.__msgIdValue + 1
@@ -104,7 +107,7 @@ class CommunicationController:
                     if msg_resp.msgType == ms.Type.Acknowledgement:
                         self.__reqList.remove(msg_req)
                         self.__delayedReq.append(msg_req)
-                return
+                continue
             else:
                 for msg in self.__reqList:
                     if msg_resp.token == msg[0].token:
@@ -146,8 +149,12 @@ class CommunicationController:
                         if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           "big") == ms.Content_Format.OCTET_STREAM:
                             # Matching for a FileDownloaded-event
-                            #if downloaded return the name
-                            self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_CONTENT))
+
+                            location = list()
+                            for lc in msg_resp.getOptionValList(ms.Options.LOCATION_PATH):
+                                location.append(lc.decode("ascii"))
+
+                            self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_CONTENT, location[-1]))
                             continue
 
                     if msg_req.msgCode == ms.Method.POST and (msg_resp.msgCode == ms.Success.Created or msg_resp.msgCode == ms.Success.Changed):
@@ -173,7 +180,6 @@ class CommunicationController:
                             location.append(lc.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.RESOURCE_CHANGED, location)
                         self.__eventQueue.put(event)
-                        pass
                     if msg_req.msgCode == ms.Method.DELETE and msg_resp.msgCode == ms.Success.Deleted:
                         # Matching for a FileDeleted-event
                         uri = list()
@@ -181,12 +187,13 @@ class CommunicationController:
                             uri.append(ur.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.FILE_DELETED, uri)
                         self.__eventQueue.put(event)
-                        pass
                     if msg_req.msgCode == ms.Method.HEAD and msg_resp.msgCode == ms.Success.Content:
                         # Matching for a FileHeader-event
-                        # Waiting for server to specify request and response format
-                        # TODO wait...
-                        pass
+                        uri = list()
+                        for ur in msg_resp.getOptionValList(ms.Options.URI_PATH):
+                            uri.append(ur.decode("ascii"))
+                        event = ev.ControllerEvent(ev.EventType.FILE_HEADER, (uri, msg_resp.getPayload().decode("ascii")))
+                        self.__eventQueue.put(event)
 
                 if msg_resp.msgClass == ms.Class.Client_Error:
                     err_msg = ms.Client_Error(msg_resp.msgCode).name

@@ -2,6 +2,7 @@ import Message as ms, CommunicationController as ComC
 
 
 class ControllerCommand:
+    extraData = None
 
     def __init__(self):
         self._message = None
@@ -26,6 +27,9 @@ class UploadFile(ControllerCommand):
         for p in path:
             self._message.addOption(ms.Options.URI_PATH, p)
         self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.OCTET_STREAM.value)
+
+        # the syspath of the file
+        extraData = file
 
 
 class RenameFile(ControllerCommand):
