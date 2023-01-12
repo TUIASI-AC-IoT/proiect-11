@@ -12,7 +12,7 @@ clientPort = 25575
 Com_Type = ms.Type.Confirmable
 
 # default path were files would be stored
-DownloadPath = "~/Downloads"
+DownloadPath = "~/Downloads/"
 
 
 class CommunicationController:
@@ -197,6 +197,13 @@ class CommunicationController:
                             for lc in msg_resp.getOptionValList(ms.Options.LOCATION_PATH):
                                 location.append(lc.decode("ascii"))
 
+                            if msg_resp.getOptionVal(ms.Options.BLOCK2) is None:
+                                with open(DownloadPath + location[-1], 'wb') as f:
+                                    f.write(msg_resp.getPayload())
+                            else:
+                                # pass receive blocks
+                                pass
+
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_CONTENT, location[-1]))
                             continue
 
@@ -210,11 +217,18 @@ class CommunicationController:
                                           'big') == ms.Content_Format.PLAIN_TEXT:
                             event = ev.ControllerEvent(ev.EventType.FOLDER_CREATED, location)
                             self.__eventQueue.put(event)
+                            continue
                         # Matching for a FileUploaded-event
-                        else:
+                        if int.from_bytes(msg_req.getOptionVal(ms.Options.CONTENT_FORMAT),
+                                          'big') == ms.Content_Format.OCTET_STREAM:
+
+                            if msg_resp.getOptionVal(ms.Options.BLOCK1) is None:
+                                #contor
+                                continue
+
                             event = ev.ControllerEvent(ev.EventType.FILE_UPLOADED, location)
                             self.__eventQueue.put(event)
-                        continue
+                            continue
 
                     if msg_req.msgCode == ms.Method.PUT and msg_resp.msgCode == ms.Success.Changed:
                         # Matching for a FileRenamed-event
@@ -223,6 +237,7 @@ class CommunicationController:
                             location.append(lc.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.RESOURCE_CHANGED, location)
                         self.__eventQueue.put(event)
+                        continue
                     if msg_req.msgCode == ms.Method.DELETE and msg_resp.msgCode == ms.Success.Deleted:
                         # Matching for a FileDeleted-event
                         uri = list()
@@ -230,7 +245,7 @@ class CommunicationController:
                             uri.append(ur.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.FILE_DELETED, uri)
                         self.__eventQueue.put(event)
-                        pass
+                        continue
                     if msg_req.msgCode == ms.Method.HEAD and msg_resp.msgCode == ms.Success.Content:
                         # Matching for a FileHeader-event
                         uri = list()
@@ -239,6 +254,7 @@ class CommunicationController:
                         event = ev.ControllerEvent(ev.EventType.FILE_HEADER,
                                                    (uri, msg_resp.getPayload().decode("ascii")))
                         self.__eventQueue.put(event)
+                        continue
 
                 if msg_resp.msgClass == ms.Class.Client_Error:
                     err_msg = ms.Client_Error(msg_resp.msgCode).name
