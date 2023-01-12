@@ -151,10 +151,12 @@ class Window(tk.Tk):
 
     def __fileMove(self, name):
         new_path = simpledialog.askstring(title='Path', prompt='Enter new path with /: ')
-        if new_path is not None:
-            uri: list = new_path.split('/')
-            uri.append(name)
-            self.__cmdQueue.put(cmd.MoveFile(uri))
+        uri = self.__pathString.copy()
+        uri.append(name)
+        # if new_path is not None:
+        #     uri: list = new_path.split('/')
+        #     uri.append(name)
+        self.__cmdQueue.put(cmd.MoveFile(uri, new_path))
 
     def __fileDetails(self, name):
         uri = self.__pathString.copy()

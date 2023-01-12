@@ -45,11 +45,12 @@ class RenameFile(ControllerCommand):
 
 
 class MoveFile(ControllerCommand):
-    def __init__(self, path: list):
+    def __init__(self, path: list, file: str):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.PUT)
         for p in path:
             self._message.addOption(ms.Options.URI_PATH, p)
+        self._message.addPayload(bytes(file, 'ascii'))
 
 
 class DeleteFile(ControllerCommand):

@@ -25,7 +25,7 @@ class CommunicationController:
     __MAX_BLOCK = 1 << (__MAX_SZX + 4)
 
     __msgIdValue = random.randint(0, 0xFFFF)
-    __tknValue = random.randint(0, 0XFFFF_FFFF_FFFF)
+    __tknValue = random.randint(0, 0XFFFF_FFFF)
 
     def __init__(self, cmdQueue: q.Queue, eventQueue: q.Queue):
         self.__sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -45,6 +45,11 @@ class CommunicationController:
         self.__delayedReq = list()
         self.__blockWiseReq = list()
         self.__resQueue = q.Queue()
+
+        # (token, resourceName, (blocksID))
+        self.__recvBlock = list()
+        # (token , (blocksID))
+        self.__sentBlock = list()
 
     def start(self):
         threading.Thread(target=self.listen_for_command, daemon=True).start()
@@ -129,10 +134,16 @@ class CommunicationController:
         while True:
             r, _, _ = select.select([self.__sk], [], [], 1)
             if r:
-                data, _ = self.__sk.recvfrom(1024)
+                data, _ = self.__sk.recvfrom(4096)
                 msg = ms.Message()
                 msg.decode(data)
                 self.__resQueue.put(msg)
+
+    def remove_req(self, req):
+        for msg in self.__reqList:
+            if req == msg[0]:
+                self.__reqList.remove(msg)
+                return
 
     def resolve_response(self):
         while True:
@@ -148,7 +159,7 @@ class CommunicationController:
                         break
                 if msg_req is not None:
                     if msg_resp.msgType == ms.Type.Acknowledgement:
-                        self.__reqList.remove(msg_req)
+                        self.remove_req(msg_req)
                         self.__delayedReq.append(msg_req)
                 continue
             else:
@@ -181,13 +192,14 @@ class CommunicationController:
                             while index < len(data):
                                 val_len = (data[index] & 0xfe) >> 1
                                 file_type = data[index] & 0x01
-                                name = data[index + 1:index + 1 + val_len].decode("ascii")
+                                name = data[index + 1:index + 1 + val_len].decode("utf-8")
                                 file_list.append((file_type, name))
                                 index += 1 + val_len
                             uri = list()
                             for ur in msg_req.getOptionValList(ms.Options.URI_PATH):
-                                uri.append(ur.decode("ascii"))
+                                uri.append(ur.decode("utf-8"))
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_LIST, (file_list, uri)))
+                            self.remove_req(msg_req)
                             continue
                         if int.from_bytes(msg_resp.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           "big") == ms.Content_Format.OCTET_STREAM:
@@ -195,7 +207,7 @@ class CommunicationController:
 
                             location = list()
                             for lc in msg_req.getOptionValList(ms.Options.URI_PATH):
-                                location.append(lc.decode("ascii"))
+                                location.append(lc.decode("utf-8"))
 
                             if msg_resp.getOptionVal(ms.Options.BLOCK2) is None:
                                 with open(os.path.join(DownloadPath, location[-1]), 'wb') as f:
@@ -203,61 +215,82 @@ class CommunicationController:
                                     f.close()
                             else:
                                 # pass receive blocks
-                                pass
-
+                                block2 = int.from_bytes(msg_resp.getOptionVal(ms.Options.BLOCK2), 'big')
+                                szx = block2 & 0x7
+                                num = block2 >> 4
+                                file_path = os.path.join(DownloadPath, location[-1])
+                                if not os.path.exists(file_path):
+                                    with (open(file_path, 'w') as f):
+                                        pass
+                                with open(file_path, 'r+b') as f:
+                                    f.seek(num << (szx + 4))
+                                    f.write(msg_resp.getPayload())
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_CONTENT, location[-1]))
+                            self.remove_req(msg_req)
                             continue
 
-                    if msg_req.msgCode == ms.Method.POST and (msg_resp.msgCode == ms.Success.Created or msg_resp.msgCode == ms.Success.Changed):
+                    if msg_req.msgCode == ms.Method.POST and (
+                            msg_resp.msgCode == ms.Success.Created or msg_resp.msgCode == ms.Success.Changed):
                         location = list()
                         for lc in msg_resp.getOptionValList(ms.Options.LOCATION_PATH):
-                            location.append(lc.decode("ascii"))
+                            location.append(lc.decode("utf-8"))
 
                         # Matching for a FolderCreated-event
                         if int.from_bytes(msg_req.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           'big') == ms.Content_Format.PLAIN_TEXT:
                             event = ev.ControllerEvent(ev.EventType.FOLDER_CREATED, location)
                             self.__eventQueue.put(event)
+                            self.remove_req(msg_req)
                             continue
                         # Matching for a FileUploaded-event
                         if int.from_bytes(msg_req.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           'big') == ms.Content_Format.OCTET_STREAM:
-
-                            if msg_resp.getOptionVal(ms.Options.BLOCK1) is None:
-                                #contor
-                                continue
+                            # if msg_resp.getOptionVal(ms.Options.BLOCK1) is None:
+                            #     for e in self.__sentBlock:
+                            #         if
+                            #     continue
+                            #
+                            # self.__sentBlock = list()
 
                             event = ev.ControllerEvent(ev.EventType.FILE_UPLOADED, location)
                             self.__eventQueue.put(event)
+                            self.remove_req(msg_req)
                             continue
 
                     if msg_req.msgCode == ms.Method.PUT and msg_resp.msgCode == ms.Success.Changed:
                         # Matching for a FileRenamed-event
                         location = list()
                         for lc in msg_resp.getOptionValList(ms.Options.LOCATION_PATH):
-                            location.append(lc.decode("ascii"))
+                            location.append(lc.decode("utf-8"))
                         event = ev.ControllerEvent(ev.EventType.RESOURCE_CHANGED, location)
                         self.__eventQueue.put(event)
+                        self.remove_req(msg_req)
                         continue
                     if msg_req.msgCode == ms.Method.DELETE and msg_resp.msgCode == ms.Success.Deleted:
                         # Matching for a FileDeleted-event
                         uri = list()
                         for ur in msg_req.getOptionValList(ms.Options.URI_PATH):
-                            uri.append(ur.decode("ascii"))
+                            uri.append(ur.decode("utf-8"))
                         event = ev.ControllerEvent(ev.EventType.FILE_DELETED, uri)
                         self.__eventQueue.put(event)
+                        self.remove_req(msg_req)
                         continue
                     if msg_req.msgCode == ms.Method.HEAD and msg_resp.msgCode == ms.Success.Content:
                         # Matching for a FileHeader-event
                         uri = list()
                         for ur in msg_resp.getOptionValList(ms.Options.URI_PATH):
-                            uri.append(ur.decode("ascii"))
+                            uri.append(ur.decode("utf-8"))
                         event = ev.ControllerEvent(ev.EventType.FILE_HEADER,
                                                    (uri, msg_resp.getPayload().decode("utf-8")))
                         self.__eventQueue.put(event)
+                        self.remove_req(msg_req)
                         continue
 
                 if msg_resp.msgClass == ms.Class.Client_Error or msg_resp.msgClass == ms.Class.Server_Error:
-                    err_msg = ms.Server_Error(msg_resp.msgCode).name
-                    prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
-                    self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
+
+                    if (msg_resp.getOptionVal(ms.Options.BLOCK1) is None) and (
+                            msg_resp.getOptionVal(ms.Options.BLOCK2) is None):
+                        err_msg = ms.Server_Error(msg_resp.msgCode).name
+                        prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
+                        self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
+                        self.remove_req(msg_req)
