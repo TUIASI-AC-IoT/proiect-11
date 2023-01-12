@@ -183,7 +183,7 @@ class Message:
 
         return res
 
-    def addPayload(self, content: bytearray):
+    def addPayload(self, content: bytes):
         self.__payload = content
 
     def getPayload(self):

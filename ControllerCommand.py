@@ -2,10 +2,10 @@ import Message as ms, CommunicationController as ComC
 
 
 class ControllerCommand:
-    extraData = None
-
     def __init__(self):
         self._message = None
+
+        self.extraData = None
 
     def getDetails(self):
         return self._message

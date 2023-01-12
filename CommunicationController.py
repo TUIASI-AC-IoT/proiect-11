@@ -1,5 +1,5 @@
 import socket, queue as q, Message as ms, ControllerEvent as ev
-import threading, select, random, time
+import threading, select, random, time, os, copy
 
 import ControllerCommand
 
@@ -22,7 +22,7 @@ class CommunicationController:
 
     # Because no negotiation this time
     __MAX_SZX = 6
-    __MAX_BLOCK = 2 ^ (__MAX_SZX + 4)
+    __MAX_BLOCK = 1 << (__MAX_SZX + 4)
 
     __msgIdValue = random.randint(0, 0xFFFF)
     __tknValue = random.randint(0, 0XFFFF_FFFF_FFFF)
@@ -73,6 +73,46 @@ class CommunicationController:
             command = self.__cmdQueue.get()
 
             msg: ms.Message = command.getDetails()
+
+            if type(command) is ControllerCommand.UploadFile:
+                file_path = command.extraData
+                file_size = os.path.getsize(file_path)
+                num = 0
+                if file_size > self.__MAX_BLOCK:
+                    # split
+                    szx = self.__MAX_SZX
+                    while file_size > self.__MAX_BLOCK:
+                        msgd = copy.deepcopy(msg)
+                        msgd.addOption(ms.Options.BLOCK1, (((num << 1) | 1) << 3) | szx)
+
+                        with open(file_path, 'rb') as f:
+                            f.seek(num << (szx + 4))
+                        msgd.addPayload(f.read(self.__MAX_BLOCK))
+                        msgd.setMessageId(self.__msgIdValue)
+                        self.__msgIdValue = self.__msgIdValue + 1
+                        msgd.setToken(self.__tknValue)
+
+                        self.send_request(msgd.encode())
+                        self.__reqList.append((msgd, time.time(), self.__ACK_TIMEOUT, 4))
+                        num = num + 1
+                        file_size = file_size - self.__MAX_BLOCK
+
+                    msg.addOption(ms.Options.BLOCK1, (((num << 1) | 0) << 3) | szx)
+                    with open(file_path, 'rb') as f:
+                        f.seek(num << (szx + 4))
+                    msg.addPayload(f.read(self.__MAX_BLOCK))
+
+                    msg.setMessageId(self.__msgIdValue)
+                    self.__msgIdValue = self.__msgIdValue + 1
+                    msg.setToken(self.__tknValue)
+                    self.__tknValue = self.__tknValue + 1
+
+                    self.__cmdQueue.task_done()
+                    continue
+                else:
+                    with open(file_path, 'rb') as f:
+                        msg.addPayload(f.read())
+
             msg.setMessageId(self.__msgIdValue)
             self.__msgIdValue = self.__msgIdValue + 1
             msg.setToken(self.__tknValue)
@@ -158,7 +198,6 @@ class CommunicationController:
                             continue
 
                     if msg_req.msgCode == ms.Method.POST and (msg_resp.msgCode == ms.Success.Created or msg_resp.msgCode == ms.Success.Changed):
-
                         location = list()
                         for lc in msg_resp.getOptionValList(ms.Options.LOCATION_PATH):
                             location.append(lc.decode("ascii"))
@@ -193,7 +232,8 @@ class CommunicationController:
                         uri = list()
                         for ur in msg_resp.getOptionValList(ms.Options.URI_PATH):
                             uri.append(ur.decode("ascii"))
-                        event = ev.ControllerEvent(ev.EventType.FILE_HEADER, (uri, msg_resp.getPayload().decode("ascii")))
+                        event = ev.ControllerEvent(ev.EventType.FILE_HEADER,
+                                                   (uri, msg_resp.getPayload().decode("ascii")))
                         self.__eventQueue.put(event)
 
                 if msg_resp.msgClass == ms.Class.Client_Error:
