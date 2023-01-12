@@ -45,14 +45,14 @@ class Window(tk.Tk):
         self.__ipVar = tk.StringVar()
         self.__ip = tk.Entry(self.__menu, textvariable=self.__ipVar)
         self.__ip.bind("<FocusOut>", self.__setServerIp)
-        self.__ip.configure(width=16)
+        self.__ip.configure(width=10)
         self.__ip.grid(column=1, row=0)
 
         # port label
         self.__portVar = tk.IntVar()
         self.__port = tk.Entry(self.__menu)
         self.__port.bind("<FocusOut>", self.__setServerPort)
-        self.__port.configure(width=6)
+        self.__port.configure(width=8)
         self.__port.grid(column=2, row=0)
 
         # backward button
@@ -115,7 +115,7 @@ class Window(tk.Tk):
         t = self.__files.item(iid).get('values')[0]
         if t == 1:
             self.__pathString.append(name)
-            self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
+            self.__cmdQueue.put(cmd.ListFolder(self.__pathString[1:len(self.__pathString)]))
 
     def __filePopup(self, event):
         iid = self.__files.identify_row(event.y)
@@ -133,30 +133,25 @@ class Window(tk.Tk):
 
     def __fileRename(self, name, iid, t):
         new_name = simpledialog.askstring(title=name, prompt='Enter new name: ', initialvalue=name)
+        tmp = self.__pathString.copy()
+        tmp.append(new_name)
         if new_name is not None:
             uri = self.__pathString.copy()
             uri.append(name)
-            self.__cmdQueue.put(cmd.RenameFile(uri, new_name))
-
-            if self.__commTypeVar.get() == 1:
-                self.__files.item(iid, values=(t, new_name))
+            self.__cmdQueue.put(cmd.RenameFile(uri, tmp))
 
     def __fileDelete(self, name, iid):
         uri = self.__pathString.copy()
         uri.append(name)
         self.__cmdQueue.put(cmd.DeleteFile(uri))
 
-        if self.__commTypeVar.get() == 1:
-            self.__files.delete(iid)
-
     def __fileMove(self, name):
         new_path = simpledialog.askstring(title='Path', prompt='Enter new path with /: ')
-        uri = self.__pathString.copy()
-        uri.append(name)
-        # if new_path is not None:
-        #     uri: list = new_path.split('/')
-        #     uri.append(name)
-        self.__cmdQueue.put(cmd.MoveFile(uri, new_path))
+        if new_path is not None:
+            uri = self.__pathString.copy()
+            uri.append(name)
+            new_path += name
+            self.__cmdQueue.put(cmd.MoveFile(uri, new_path))
 
     def __fileDetails(self, name):
         uri = self.__pathString.copy()
@@ -181,7 +176,13 @@ class Window(tk.Tk):
                 for f in files:
                     self.__files.insert('', tk.END, values=f)
 
-                self.__pathString = path
+                if path[0] == "":
+                    self.__pathString = path
+                else:
+                    self.__pathString.clear()
+                    self.__pathString.append("")
+                    for p in path:
+                        self.__pathString.append(p)
 
                 tmp = ""
                 for p in path:
@@ -195,16 +196,15 @@ class Window(tk.Tk):
                 (path, text) = event.data
                 messagebox.showinfo(path, text)
             elif event.eventType == ce.EventType.FOLDER_CREATED:
-                if event.data[0:len(event.data) - 1] == self.__pathString[0:len(self.__pathString)]:
+                if event.data[0:len(event.data) - 1] == self.__pathString[1:len(self.__pathString)]:
                     self.__files.insert('', tk.END, values=(1, event.data[-1]))
             elif event.eventType == ce.EventType.FILE_UPLOADED:
-                if event.data[0:len(event.data) - 1] == self.__pathString[0:len(self.__pathString)]:
+                if event.data[0:len(event.data) - 1] == self.__pathString[1:len(self.__pathString)]:
                     self.__files.insert('', tk.END, values=(0, event.data[-1]))
             elif event.eventType == ce.EventType.RESOURCE_CHANGED:
-                self.__cmdQueue.put(cmd.ListFolder(event.data[0:len(event.data)]))
+                self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
             elif event.eventType == ce.EventType.FILE_DELETED:
-                if event.data[0:len(event.data) - 1] == self.__pathString[0:len(self.__pathString)]:
-                    self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
+                self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
             elif event.eventType == ce.EventType.REQUEST_FAILED:
                 messagebox.showinfo("Request failed!", event.data)
             elif event.eventType == ce.EventType.REQUEST_FAILED:
@@ -215,14 +215,12 @@ class Window(tk.Tk):
     def __uploadFileCB(self):
         file = filedialog.askopenfilename()
         if file != "":
-            self.__cmdQueue.put(cmd.UploadFile(self.__pathString, file))
+            self.__cmdQueue.put(cmd.UploadFile(self.__pathString[1:len(self.__pathString)], file))
 
     def __createFolderCB(self):
         name = simpledialog.askstring(title="New folder", prompt='Enter name: ')
         if name is not None:
             uri = self.__pathString.copy()
+            uri = uri[1:len(uri)]
             uri.append(name)
             self.__cmdQueue.put(cmd.CreateFolder(uri))
-
-            if self.__commTypeVar.get() == 1:
-                self.__files.insert('', tk.END, values=(1, name))

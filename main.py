@@ -24,5 +24,5 @@ if __name__ == '__main__':
 
     # Interface part
     ui = GUI.Window(commandsQueue, eventsQueue)
-    ui.title("widuv")
+    ui.title("Filezilla or smf...")
     ui.mainloop()

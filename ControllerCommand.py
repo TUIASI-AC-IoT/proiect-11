@@ -36,12 +36,16 @@ class UploadFile(ControllerCommand):
 
 
 class RenameFile(ControllerCommand):
-    def __init__(self, path: list, newName):
+    def __init__(self, path: list, newName: list):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.PUT)
         for p in path:
             self._message.addOption(ms.Options.URI_PATH, p)
-        self._message.addPayload(bytearray(newName, 'ascii'))
+        str = ""
+        for p in newName:
+            str += p + "/"
+
+        self._message.addPayload(bytearray(str[0:len(str)], 'ascii'))
 
 
 class MoveFile(ControllerCommand):

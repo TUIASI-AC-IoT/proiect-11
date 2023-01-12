@@ -68,6 +68,7 @@ class CommunicationController:
                         req[3] -= 1
                         req[2] *= self.__ACK_RANDOM_FACTOR
                         req[1] = time.time()
+                        self.__sk.sendto(req[0], (serverIp, serverPort))
                     else:
                         self.__cmdQueue.put(
                             ev.ControllerEvent(ev.EventType.REQUEST_TIMEOUT, ms.Method(req[0].msgCode).name))
@@ -217,7 +218,7 @@ class CommunicationController:
                                 # receive blocks
                                 block2 = int.from_bytes(msg_resp.getOptionVal(ms.Options.BLOCK2), 'big')
                                 szx = block2 & 0x7
-                                m = block2 & 0x8
+                                m = (block2 & 0x8) >> 3
                                 num = block2 >> 4
 
                                 file_path = os.path.join(DownloadPath, location[-1])
@@ -244,6 +245,8 @@ class CommunicationController:
                                     nextBlock.msgId = self.__msgIdValue
                                     self.__msgIdValue = self.__msgIdValue + 1
                                     nextBlock.addOption(ms.Options.BLOCK2, (num << 4) + szx)
+                                    for op in msg_resp.getOptionValList(ms.Options.URI_PATH):
+                                        nextBlock.addOption(ms.Options.URI_PATH, op)
                                     self.send_request(nextBlock.encode())
                                     self.__reqList.append((nextBlock, time.time(), self.__ACK_TIMEOUT, 4))
                                     self.remove_req(msg_req)
@@ -315,8 +318,12 @@ class CommunicationController:
                     prompt = ""
                     if (msg_resp.getOptionVal(ms.Options.BLOCK1) is None) and (
                             msg_resp.getOptionVal(ms.Options.BLOCK2) is None):
-                        err_msg = ms.Server_Error(msg_resp.msgCode).name
-                        prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
+                        err_msg = ms.Class(msg_resp.msgClass).name + ", "
+                        if msg_resp.msgClass == ms.Class.Server_Error:
+                            err_msg += ms.Server_Error(msg_resp.msgCode).name
+                        else:
+                            err_msg += ms.Client_Error(msg_resp.msgCode).name
+                        prompt = ms.Method(msg_req.msgCode).name + " request error: " + err_msg
 
                     if msg_resp.getOptionVal(ms.Options.BLOCK2) is not None:
                         transaction = None
