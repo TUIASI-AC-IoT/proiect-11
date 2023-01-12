@@ -142,7 +142,7 @@ class CommunicationController:
                                 file_list.append((file_type, name))
                                 index += 1 + val_len
                             uri = list()
-                            for ur in msg_resp.getOptionValList(ms.Options.URI_PATH):
+                            for ur in msg_req.getOptionValList(ms.Options.URI_PATH):
                                 uri.append(ur.decode("ascii"))
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_LIST, (file_list, uri)))
                             continue
@@ -187,6 +187,7 @@ class CommunicationController:
                             uri.append(ur.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.FILE_DELETED, uri)
                         self.__eventQueue.put(event)
+                        pass
                     if msg_req.msgCode == ms.Method.HEAD and msg_resp.msgCode == ms.Success.Content:
                         # Matching for a FileHeader-event
                         uri = list()

@@ -75,6 +75,7 @@ class Window(tk.Tk):
         self.__files.pack(fill="both", expand=True)
 
         self.__files.bind("<ButtonRelease-3>", self.__filePopup)
+        self.__files.bind("<Double-1>", self.__fileDoubleClick)
 
         # bottom menu frame
         self.__actions = tk.Frame(self, highlightbackground="black", highlightthickness=1)
@@ -106,30 +107,43 @@ class Window(tk.Tk):
         if len(self.__pathString) != 1:
             self.__cmdQueue.put(cmd.ListFolder(self.__pathString[0:len(self.__pathString) - 1]))
 
+    def __fileDoubleClick(self, event):
+        iid = self.__files.identify_row(event.y)
+        name = self.__files.item(iid).get('values')[1]
+        self.__pathString.append(name)
+        self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
+
     def __filePopup(self, event):
         iid = self.__files.identify_row(event.y)
         name = self.__files.item(iid).get('values')[1]
+        t = self.__files.item(iid).get('values')[0]
         if iid:
             menu = tk.Menu(self, tearoff=0)
-            menu.add_command(label="Rename", command=partial(self.__fileRename, name))
-            menu.add_command(label="Delete", command=partial(self.__fileDelete, name))
+            menu.add_command(label="Rename", command=partial(self.__fileRename, name, iid, t))
+            menu.add_command(label="Delete", command=partial(self.__fileDelete, name, iid))
             menu.add_command(label="Move", command=partial(self.__fileMove, name))
             menu.add_command(label="Details", command=partial(self.__fileDetails, name))
             if self.__files.item(iid).get('values')[0] == 1:
                 menu.add_command(label="Download", command=partial(self.__fileDownload, name))
             menu.tk_popup(event.x_root, event.y_root, 1)
 
-    def __fileRename(self, name):
+    def __fileRename(self, name, iid, t):
         new_name = simpledialog.askstring(title=name, prompt='Enter new name: ', initialvalue=name)
         if new_name is not None:
             uri = self.__pathString.copy()
             uri.append(name)
             self.__cmdQueue.put(cmd.RenameFile(uri, new_name))
 
-    def __fileDelete(self, name):
+            if self.__commTypeVar.get() == 1:
+                self.__files.item(iid, values=(t, new_name))
+
+    def __fileDelete(self, name, iid):
         uri = self.__pathString.copy()
         uri.append(name)
         self.__cmdQueue.put(cmd.DeleteFile(uri))
+
+        if self.__commTypeVar.get() == 1:
+            self.__files.delete(iid)
 
     def __fileMove(self, name):
         new_path = simpledialog.askstring(title='Path', prompt='Enter new path with /: ')
@@ -156,8 +170,18 @@ class Window(tk.Tk):
                 for item in self.__files.get_children():
                     self.__files.delete(item)
 
-                for i in event.data:
-                    self.__files.insert('', tk.END, values=i)
+                (files, path) = event.data
+                for f in files:
+                    self.__files.insert('', tk.END, values=f)
+
+                self.__pathString = path
+                tmp = ""
+                for p in path:
+                    if p != "":
+                        tmp += "/" + p
+                self.__path.configure(text=tmp)
+            elif event.eventType == ce.EventType.FILE_CONTENT:
+                pass
 
             self.__eventQueue.task_done()
 
@@ -172,3 +196,6 @@ class Window(tk.Tk):
             uri = self.__pathString.copy()
             uri.append(name)
             self.__cmdQueue.put(cmd.CreateFolder(uri))
+
+            if self.__commTypeVar.get() == 1:
+                self.__files.insert('', tk.END, values=(1, name))

@@ -139,12 +139,12 @@ class Message:
                 prevOption = op
 
             # append option value
-            if type(val) is str:
-                for b in bytes(val, 'ascii'):
-                    message.append(b)
-            else:
-                for b in val.to_bytes(valLen, 'big'):
-                    message.append(b)
+            # if type(val) is str:
+            #     for b in bytes(val, 'ascii'):
+            #         message.append(b)
+            # else:
+            for b in val:
+                message.append(b)
 
         # append payload if exist
         if len(self.__payload) != 0:
@@ -155,9 +155,13 @@ class Message:
         return message
 
     def addOption(self, option, value):
-        if value is int:
-            value = bytes(value, 'big')
-        if value is str:
+        if type(value) is int:
+            length = 1
+            while value > 0:
+                value = value >> 8
+                length = length + 1
+            value = value.to_bytes(length, "big")
+        if type(value) is str:
             value = bytes(value, 'ascii')
 
         self.__options.append((option, value))
