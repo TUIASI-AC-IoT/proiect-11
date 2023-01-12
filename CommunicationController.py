@@ -12,7 +12,7 @@ clientPort = 25575
 Com_Type = ms.Type.Confirmable
 
 # default path were files would be stored
-DownloadPath = "~/Downloads/"
+DownloadPath = "Downloads/"
 
 
 class CommunicationController:
@@ -194,12 +194,13 @@ class CommunicationController:
                             # Matching for a FileDownloaded-event
 
                             location = list()
-                            for lc in msg_resp.getOptionValList(ms.Options.LOCATION_PATH):
+                            for lc in msg_req.getOptionValList(ms.Options.URI_PATH):
                                 location.append(lc.decode("ascii"))
 
                             if msg_resp.getOptionVal(ms.Options.BLOCK2) is None:
-                                with open(DownloadPath + location[-1], 'wb') as f:
+                                with open(os.path.join(DownloadPath, location[-1]), 'wb') as f:
                                     f.write(msg_resp.getPayload())
+                                    f.close()
                             else:
                                 # pass receive blocks
                                 pass

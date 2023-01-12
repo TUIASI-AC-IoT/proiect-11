@@ -1,3 +1,4 @@
+import os.path
 import tkinter as tk
 from tkinter import ttk
 from tkinter import simpledialog
@@ -161,6 +162,7 @@ class Window(tk.Tk):
         self.__cmdQueue.put(cmd.GetMetadata(uri))
 
     def __fileDownload(self, name):
+        com.DownloadPath = filedialog.askdirectory()
         uri = self.__pathString.copy()
         uri.append(name)
         self.__cmdQueue.put(cmd.DownloadFile(uri))
