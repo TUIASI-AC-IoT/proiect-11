@@ -1,4 +1,5 @@
 import Message as ms, CommunicationController as ComC
+import os
 
 
 class ControllerCommand:
@@ -21,11 +22,13 @@ class CreateFolder(ControllerCommand):
 
 
 class UploadFile(ControllerCommand):
-    def __init__(self, path: list, file):
+    def __init__(self, path: list, file: str):
         super().__init__()
         self._message = ms.Message(ComC.Com_Type, ms.Class.Method, ms.Method.POST)
         for p in path:
             self._message.addOption(ms.Options.URI_PATH, p)
+        filename = os.path.basename(file)
+        self._message.addOption(ms.Options.URI_PATH, filename)
         self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.OCTET_STREAM.value)
 
         # the syspath of the file

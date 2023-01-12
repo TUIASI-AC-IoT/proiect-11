@@ -241,7 +241,7 @@ class CommunicationController:
                     if msg_req.msgCode == ms.Method.DELETE and msg_resp.msgCode == ms.Success.Deleted:
                         # Matching for a FileDeleted-event
                         uri = list()
-                        for ur in msg_resp.getOptionValList(ms.Options.URI_PATH):
+                        for ur in msg_req.getOptionValList(ms.Options.URI_PATH):
                             uri.append(ur.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.FILE_DELETED, uri)
                         self.__eventQueue.put(event)
@@ -252,14 +252,11 @@ class CommunicationController:
                         for ur in msg_resp.getOptionValList(ms.Options.URI_PATH):
                             uri.append(ur.decode("ascii"))
                         event = ev.ControllerEvent(ev.EventType.FILE_HEADER,
-                                                   (uri, msg_resp.getPayload().decode("ascii")))
+                                                   (uri, msg_resp.getPayload().decode("utf-8")))
                         self.__eventQueue.put(event)
                         continue
 
-                if msg_resp.msgClass == ms.Class.Client_Error:
-                    err_msg = ms.Client_Error(msg_resp.msgCode).name
-                else:
+                if msg_resp.msgClass == ms.Class.Client_Error or msg_resp.msgClass == ms.Class.Server_Error:
                     err_msg = ms.Server_Error(msg_resp.msgCode).name
-
-                prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
-                self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
+                    prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
+                    self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))

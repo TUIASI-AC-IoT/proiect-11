@@ -126,7 +126,7 @@ class Window(tk.Tk):
             menu.add_command(label="Delete", command=partial(self.__fileDelete, name, iid))
             menu.add_command(label="Move", command=partial(self.__fileMove, name))
             menu.add_command(label="Details", command=partial(self.__fileDetails, name))
-            if self.__files.item(iid).get('values')[0] == 1:
+            if t == 0:
                 menu.add_command(label="Download", command=partial(self.__fileDownload, name))
             menu.tk_popup(event.x_root, event.y_root, 1)
 
