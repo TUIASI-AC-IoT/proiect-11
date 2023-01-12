@@ -214,17 +214,41 @@ class CommunicationController:
                                     f.write(msg_resp.getPayload())
                                     f.close()
                             else:
-                                # pass receive blocks
+                                # receive blocks
                                 block2 = int.from_bytes(msg_resp.getOptionVal(ms.Options.BLOCK2), 'big')
                                 szx = block2 & 0x7
+                                m = block2 & 0x8
                                 num = block2 >> 4
+
                                 file_path = os.path.join(DownloadPath, location[-1])
+                                if num == 0:
+                                    self.__recvBlock.append((msg_resp.token, file_path, list().append(0)))
+                                else:
+                                    for trz in self.__recvBlock:
+                                        if trz[0] == msg_resp.token:
+                                            file_path = trz[1]
+                                            # trz[2].append(num)
+                                            break
+
                                 if not os.path.exists(file_path):
                                     with (open(file_path, 'w') as f):
                                         pass
                                 with open(file_path, 'r+b') as f:
                                     f.seek(num << (szx + 4))
                                     f.write(msg_resp.getPayload())
+
+                                if m == 1:
+                                    num = num + 1
+                                    nextBlock = ms.Message(Com_Type, ms.Class.Method, ms.Method.GET)
+                                    nextBlock.token = msg_resp.token
+                                    nextBlock.msgId = self.__msgIdValue
+                                    self.__msgIdValue = self.__msgIdValue + 1
+                                    nextBlock.addOption(ms.Options.BLOCK2, (num << 4) + szx)
+                                    self.send_request(nextBlock.encode())
+                                    self.__reqList.append((nextBlock, time.time(), self.__ACK_TIMEOUT, 4))
+                                    self.remove_req(msg_req)
+                                    continue
+
                             self.__eventQueue.put(ev.ControllerEvent(ev.EventType.FILE_CONTENT, location[-1]))
                             self.remove_req(msg_req)
                             continue
@@ -288,9 +312,21 @@ class CommunicationController:
 
                 if msg_resp.msgClass == ms.Class.Client_Error or msg_resp.msgClass == ms.Class.Server_Error:
 
+                    prompt = ""
                     if (msg_resp.getOptionVal(ms.Options.BLOCK1) is None) and (
                             msg_resp.getOptionVal(ms.Options.BLOCK2) is None):
                         err_msg = ms.Server_Error(msg_resp.msgCode).name
                         prompt = ms.Method(msg_req.msgCode).name + "request error: " + err_msg
-                        self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
-                        self.remove_req(msg_req)
+
+                    if msg_resp.getOptionVal(ms.Options.BLOCK2) is not None:
+                        transaction = None
+                        for trz in self.__recvBlock:
+                            if trz[0] == msg_resp.token:
+                                transaction = trz
+                                break
+                        if transaction is not None:
+                            prompt = "Error while downloading " + transaction[1]
+                            self.__recvBlock.remove(transaction)
+                    self.__eventQueue.put(ev.ControllerEvent(ev.EventType.REQUEST_FAILED, prompt))
+                    self.remove_req(msg_req)
+
