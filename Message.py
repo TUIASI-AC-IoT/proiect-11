@@ -156,9 +156,10 @@ class Message:
 
     def addOption(self, option, value):
         if type(value) is int:
-            length = 1
-            while value > 0:
-                value = value >> 8
+            tmp = value
+            length = 0
+            while tmp > 0:
+                tmp = tmp >> 8
                 length = length + 1
             value = value.to_bytes(length, "big")
         if type(value) is str:

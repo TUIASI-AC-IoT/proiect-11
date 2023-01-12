@@ -83,11 +83,11 @@ class CommunicationController:
                     szx = self.__MAX_SZX
                     while file_size > self.__MAX_BLOCK:
                         msgd = copy.deepcopy(msg)
-                        msgd.addOption(ms.Options.BLOCK1, (((num << 1) | 1) << 3) | szx)
+                        msgd.addOption(ms.Options.BLOCK1, (((num << 1) + 1) << 3) + szx)
 
                         with open(file_path, 'rb') as f:
                             f.seek(num << (szx + 4))
-                        msgd.addPayload(f.read(self.__MAX_BLOCK))
+                            msgd.addPayload(f.read(self.__MAX_BLOCK))
                         msgd.setMessageId(self.__msgIdValue)
                         self.__msgIdValue = self.__msgIdValue + 1
                         msgd.setToken(self.__tknValue)
@@ -100,12 +100,15 @@ class CommunicationController:
                     msg.addOption(ms.Options.BLOCK1, (((num << 1) | 0) << 3) | szx)
                     with open(file_path, 'rb') as f:
                         f.seek(num << (szx + 4))
-                    msg.addPayload(f.read(self.__MAX_BLOCK))
+                        msg.addPayload(f.read(self.__MAX_BLOCK))
 
                     msg.setMessageId(self.__msgIdValue)
                     self.__msgIdValue = self.__msgIdValue + 1
                     msg.setToken(self.__tknValue)
                     self.__tknValue = self.__tknValue + 1
+
+                    self.send_request(msg.encode())
+                    self.__reqList.append((msg, time.time(), self.__ACK_TIMEOUT, 4))
 
                     self.__cmdQueue.task_done()
                     continue

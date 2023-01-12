@@ -29,7 +29,7 @@ class UploadFile(ControllerCommand):
         self._message.addOption(ms.Options.CONTENT_FORMAT, ms.Content_Format.OCTET_STREAM.value)
 
         # the syspath of the file
-        extraData = file
+        self.extraData = file
 
 
 class RenameFile(ControllerCommand):
