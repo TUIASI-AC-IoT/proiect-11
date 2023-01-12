@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import simpledialog
 from tkinter import filedialog
+from tkinter import messagebox
 from functools import partial
 import CommunicationController as com
 import ControllerCommand as cmd
@@ -110,8 +111,10 @@ class Window(tk.Tk):
     def __fileDoubleClick(self, event):
         iid = self.__files.identify_row(event.y)
         name = self.__files.item(iid).get('values')[1]
-        self.__pathString.append(name)
-        self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
+        t = self.__files.item(iid).get('values')[0]
+        if t == 1:
+            self.__pathString.append(name)
+            self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
 
     def __filePopup(self, event):
         iid = self.__files.identify_row(event.y)
@@ -175,13 +178,33 @@ class Window(tk.Tk):
                     self.__files.insert('', tk.END, values=f)
 
                 self.__pathString = path
+
                 tmp = ""
                 for p in path:
                     if p != "":
                         tmp += "/" + p
+
                 self.__path.configure(text=tmp)
             elif event.eventType == ce.EventType.FILE_CONTENT:
-                pass
+                messagebox.showinfo("File downloaded!", event.data)
+            elif event.eventType == ce.EventType.FILE_HEADER:
+                (path, text) = event.data
+                messagebox.showinfo(path, text)
+            elif event.eventType == ce.EventType.FOLDER_CREATED:
+                if event.data[0:len(event.data) - 1] == self.__pathString[0:len(self.__pathString)]:
+                    self.__files.insert('', tk.END, values=(1, event.data[-1]))
+            elif event.eventType == ce.EventType.FILE_UPLOADED:
+                if event.data[0:len(event.data) - 1] == self.__pathString[0:len(self.__pathString)]:
+                    self.__files.insert('', tk.END, values=(0, event.data[-1]))
+            elif event.eventType == ce.EventType.RESOURCE_CHANGED:
+                self.__cmdQueue.put(cmd.ListFolder(event.data[0:len(event.data)]))
+            elif event.eventType == ce.EventType.FILE_DELETED:
+                if event.data[0:len(event.data) - 1] == self.__pathString[0:len(self.__pathString)]:
+                    self.__cmdQueue.put(cmd.ListFolder(self.__pathString))
+            elif event.eventType == ce.EventType.REQUEST_FAILED:
+                messagebox.showinfo("Request failed!", event.data)
+            elif event.eventType == ce.EventType.REQUEST_FAILED:
+                messagebox.showinfo("Request timeout!", event.data)
 
             self.__eventQueue.task_done()
 

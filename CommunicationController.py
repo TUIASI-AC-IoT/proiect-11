@@ -167,10 +167,11 @@ class CommunicationController:
                         if int.from_bytes(msg_req.getOptionVal(ms.Options.CONTENT_FORMAT),
                                           'big') == ms.Content_Format.PLAIN_TEXT:
                             event = ev.ControllerEvent(ev.EventType.FOLDER_CREATED, location)
+                            self.__eventQueue.put(event)
                         # Matching for a FileUploaded-event
                         else:
                             event = ev.ControllerEvent(ev.EventType.FILE_UPLOADED, location)
-                        self.__eventQueue.put(event)
+                            self.__eventQueue.put(event)
                         continue
 
                     if msg_req.msgCode == ms.Method.PUT and msg_resp.msgCode == ms.Success.Changed:
